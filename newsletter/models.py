@@ -28,6 +28,7 @@ class Article:
     title: str
     url: str
     source: str
+    title_zh: str = ""
     publish_date: str = ""
     excerpt: str = ""
     relevance_score: int = 0
@@ -46,6 +47,7 @@ class Article:
             title=row.get("title", ""),
             url=row.get("url", ""),
             source=row.get("source", ""),
+            title_zh=row.get("title_zh", ""),
             publish_date=row.get("publish_date", ""),
             excerpt=row.get("excerpt", ""),
             relevance_score=int(row.get("relevance_score", "0") or 0),
@@ -61,6 +63,7 @@ ARTICLE_HEADERS = [
     "title",
     "url",
     "source",
+    "title_zh",
     "publish_date",
     "excerpt",
     "relevance_score",
@@ -74,4 +77,3 @@ ARTICLE_HEADERS = [
 SOURCE_HEADERS = ["name", "url", "source_type", "priority", "enabled"]
 ISSUE_HEADERS = ["issue_date", "newsletter_subject", "brevo_campaign_id", "approval_status", "html_path"]
 CONFIG_HEADERS = ["key", "value"]
-

@@ -8,7 +8,7 @@ from .brevo import brevo_config_issues, create_draft_campaign
 from .collectors import collect_from_source
 from .config import get_settings
 from .models import Article
-from .render import render_newsletter
+from .render import EXCLUDED_SECTIONS, SECTIONS, render_newsletter
 from .scoring import dedupe_articles
 from .storage import get_store
 
@@ -37,6 +37,8 @@ def generate(max_items: int = 12) -> tuple[str, str, str]:
         article
         for article in articles
         if article.status in {"selected", "new"} and article.relevance_score >= 10
+        and article.category in SECTIONS
+        and article.category not in EXCLUDED_SECTIONS
     ]
     selected = sorted(selected, key=lambda item: item.relevance_score, reverse=True)[:max_items]
     summarized_urls = {article.url for article in selected}
@@ -63,7 +65,13 @@ def generate(max_items: int = 12) -> tuple[str, str, str]:
 def create_campaign() -> str:
     settings = get_settings()
     store = get_store(settings)
-    articles = [article for article in store.read_articles() if article.status == "summarized"]
+    articles = [
+        article
+        for article in store.read_articles()
+        if article.status == "summarized"
+        and article.category in SECTIONS
+        and article.category not in EXCLUDED_SECTIONS
+    ]
     subject, html, html_path = render_newsletter(articles[:12], settings.local_data_dir)
     campaign_id = create_draft_campaign(settings, subject, html)
     store.append_issue(
