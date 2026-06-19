@@ -11,9 +11,10 @@ from .models import Article
 def fallback_summary(article: Article) -> Article:
     base = article.excerpt or article.title
     trimmed = base[:260]
+    article.title_zh = article.title_zh or article.title
     article.summary_en = trimmed
     article.summary_zh = "請在發送前由編輯補充中文摘要。"
-    article.why_it_matters = "Potentially relevant to Hong Kong PPP, infrastructure, procurement, or public works developments."
+    article.why_it_matters = "可能與香港公私營合作、基建、採購或公共工程發展相關。"
     article.status = "summarized"
     return article
 
@@ -44,8 +45,9 @@ def summarize_article(article: Article, settings: Settings) -> Article:
                     "role": "system",
                     "content": (
                         "You summarize public-private partnership and infrastructure news for a professional Hong Kong newsletter. "
-                        "Return strict JSON with summary_en, summary_zh_hant, and why_it_matters. "
-                        "Use Traditional Chinese for summary_zh_hant. Do not invent facts beyond the provided metadata/excerpt."
+                        "Return strict JSON with title_zh_hant, summary_zh_hant, why_it_matters_zh_hant, and summary_en. "
+                        "Use Traditional Chinese as used in Hong Kong for title_zh_hant, summary_zh_hant, and why_it_matters_zh_hant. "
+                        "Do not invent facts beyond the provided metadata/excerpt."
                     ),
                 },
                 {"role": "user", "content": json.dumps(prompt, ensure_ascii=False)},
@@ -56,9 +58,9 @@ def summarize_article(article: Article, settings: Settings) -> Article:
     response.raise_for_status()
     content = response.json()["choices"][0]["message"]["content"]
     data = json.loads(content)
+    article.title_zh = str(data.get("title_zh_hant", "")).strip()
     article.summary_en = str(data.get("summary_en", "")).strip()
     article.summary_zh = str(data.get("summary_zh_hant", "")).strip()
-    article.why_it_matters = str(data.get("why_it_matters", "")).strip()
+    article.why_it_matters = str(data.get("why_it_matters_zh_hant", "")).strip()
     article.status = "summarized"
     return article
-
