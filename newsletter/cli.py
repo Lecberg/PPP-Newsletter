@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date
+from datetime import date, timedelta
 
-from .ai import summarize_article
+from .ai import needs_ai_summary, summarize_article
 from .brevo import brevo_config_issues, create_draft_campaign
 from .collectors import collect_from_source
 from .config import get_settings
@@ -11,9 +11,28 @@ from .models import Article
 from .render import EXCLUDED_SECTIONS, SECTIONS, render_newsletter
 from .scoring import dedupe_articles
 from .storage import get_store
+from .text import repair_mojibake
 
 
-def collect(limit_per_source: int = 25) -> list[Article]:
+DEFAULT_LIMIT_PER_SOURCE = 100
+DEFAULT_MAX_ITEMS = 30
+DEFAULT_LOOKBACK_DAYS = 31
+MIN_RELEVANCE_SCORE = 10
+NOISE_TITLE_PHRASES = {
+    "open in new window",
+    "homepage",
+    "skip to",
+    "sitemap",
+    "contact us",
+    "privacy policy",
+    "search",
+    "list of gazette",
+    "網站指南",
+    "跳至主要內容",
+}
+
+
+def collect(limit_per_source: int = DEFAULT_LIMIT_PER_SOURCE) -> list[Article]:
     settings = get_settings()
     store = get_store(settings)
     collected: list[Article] = []
@@ -29,26 +48,26 @@ def collect(limit_per_source: int = 25) -> list[Article]:
     return merged
 
 
-def generate(max_items: int = 12) -> tuple[str, str, str]:
+def generate(max_items: int = DEFAULT_MAX_ITEMS, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> tuple[str, str, str]:
     settings = get_settings()
     store = get_store(settings)
     articles = store.read_articles()
-    selected = [
+    eligible = [
         article
         for article in articles
-        if article.status in {"selected", "new"} and article.relevance_score >= 10
-        and article.category in SECTIONS
-        and article.category not in EXCLUDED_SECTIONS
+        if _is_newsletter_candidate(article, lookback_days=lookback_days, min_score=MIN_RELEVANCE_SCORE)
     ]
-    selected = sorted(selected, key=lambda item: item.relevance_score, reverse=True)[:max_items]
-    summarized_urls = {article.url for article in selected}
-    summarized = [summarize_article(article, settings) for article in selected]
+    selected = sorted(eligible, key=lambda item: item.relevance_score, reverse=True)[:max_items]
+    to_summarize = [article for article in selected if needs_ai_summary(article)]
+    summarized_urls = {article.url for article in to_summarize}
+    summarized = [summarize_article(article, settings) for article in to_summarize]
+    summarized_by_url = {article.url: article for article in summarized}
+    draft_articles = [summarized_by_url.get(article.url, article) for article in selected]
     updated = []
     for article in articles:
-        replacement = next((item for item in summarized if item.url == article.url), None)
-        updated.append(replacement or article)
+        updated.append(summarized_by_url.get(article.url, article))
     store.write_articles(updated)
-    subject, html, html_path = render_newsletter(summarized, settings.local_data_dir)
+    subject, html, html_path = render_newsletter(draft_articles, settings.local_data_dir)
     store.append_issue(
         {
             "issue_date": date.today().isoformat(),
@@ -58,21 +77,26 @@ def generate(max_items: int = 12) -> tuple[str, str, str]:
             "html_path": str(html_path),
         }
     )
-    print(f"Generated newsletter draft with {len(summarized_urls)} articles: {html_path}")
+    if len(draft_articles) < max_items:
+        print(
+            f"[warn] only {len(draft_articles)} eligible articles found in the last {lookback_days} days "
+            f"(requested {max_items})."
+        )
+    print(f"Generated newsletter draft with {len(draft_articles)} articles; refreshed {len(summarized_urls)} summaries: {html_path}")
     return subject, html, str(html_path)
 
 
-def create_campaign() -> str:
+def create_campaign(max_items: int = DEFAULT_MAX_ITEMS, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> str:
     settings = get_settings()
     store = get_store(settings)
     articles = [
         article
         for article in store.read_articles()
         if article.status == "summarized"
-        and article.category in SECTIONS
-        and article.category not in EXCLUDED_SECTIONS
+        and _is_newsletter_candidate(article, lookback_days=lookback_days, min_score=MIN_RELEVANCE_SCORE)
     ]
-    subject, html, html_path = render_newsletter(articles[:12], settings.local_data_dir)
+    articles = sorted(articles, key=lambda item: item.relevance_score, reverse=True)
+    subject, html, html_path = render_newsletter(articles[:max_items], settings.local_data_dir)
     campaign_id = create_draft_campaign(settings, subject, html)
     store.append_issue(
         {
@@ -92,29 +116,76 @@ def create_campaign() -> str:
     return campaign_id
 
 
-def run_weekly() -> None:
-    collect()
-    generate()
-    create_campaign()
+def run_weekly(
+    limit_per_source: int = DEFAULT_LIMIT_PER_SOURCE,
+    max_items: int = DEFAULT_MAX_ITEMS,
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+) -> None:
+    collect(limit_per_source=limit_per_source)
+    generate(max_items=max_items, lookback_days=lookback_days)
+    create_campaign(max_items=max_items, lookback_days=lookback_days)
+
+
+def _is_newsletter_candidate(
+    article: Article,
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+    min_score: int = MIN_RELEVANCE_SCORE,
+) -> bool:
+    return (
+        article.status in {"selected", "new", "summarized", "rejected"}
+        and article.relevance_score >= min_score
+        and article.category in SECTIONS
+        and article.category not in EXCLUDED_SECTIONS
+        and _is_within_lookback(article, lookback_days=lookback_days)
+        and _looks_like_news_content(article)
+    )
+
+
+def _is_within_lookback(article: Article, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> bool:
+    if lookback_days <= 0 or not article.publish_date:
+        return True
+    try:
+        published = date.fromisoformat(article.publish_date)
+    except ValueError:
+        return True
+    return published >= date.today() - timedelta(days=lookback_days)
+
+
+def _looks_like_news_content(article: Article) -> bool:
+    title = repair_mojibake(article.title).strip()
+    lowered = title.lower()
+    if len(title) < 12:
+        return False
+    return not any(phrase in lowered or phrase in title for phrase in NOISE_TITLE_PHRASES)
 
 
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Hong Kong PPP newsletter automation")
     subparsers = parser.add_subparsers(dest="command", required=True)
     collect_parser = subparsers.add_parser("collect")
-    collect_parser.add_argument("--limit-per-source", type=int, default=25)
+    collect_parser.add_argument("--limit-per-source", type=int, default=DEFAULT_LIMIT_PER_SOURCE)
     generate_parser = subparsers.add_parser("generate")
-    generate_parser.add_argument("--max-items", type=int, default=12)
-    subparsers.add_parser("create-campaign")
-    subparsers.add_parser("run-weekly")
+    generate_parser.add_argument("--max-items", type=int, default=DEFAULT_MAX_ITEMS)
+    generate_parser.add_argument("--lookback-days", type=int, default=DEFAULT_LOOKBACK_DAYS)
+    campaign_parser = subparsers.add_parser("create-campaign")
+    campaign_parser.add_argument("--max-items", type=int, default=DEFAULT_MAX_ITEMS)
+    campaign_parser.add_argument("--lookback-days", type=int, default=DEFAULT_LOOKBACK_DAYS)
+    run_parser = subparsers.add_parser("run-weekly")
+    run_parser.add_argument("--limit-per-source", type=int, default=DEFAULT_LIMIT_PER_SOURCE)
+    run_parser.add_argument("--max-items", type=int, default=DEFAULT_MAX_ITEMS)
+    run_parser.add_argument("--lookback-days", type=int, default=DEFAULT_LOOKBACK_DAYS)
+    monthly_parser = subparsers.add_parser("run-monthly")
+    monthly_parser.add_argument("--limit-per-source", type=int, default=DEFAULT_LIMIT_PER_SOURCE)
+    monthly_parser.add_argument("--max-items", type=int, default=DEFAULT_MAX_ITEMS)
+    monthly_parser.add_argument("--lookback-days", type=int, default=DEFAULT_LOOKBACK_DAYS)
     args = parser.parse_args(argv)
 
     if args.command == "collect":
         collect(args.limit_per_source)
     elif args.command == "generate":
-        generate(args.max_items)
+        generate(args.max_items, args.lookback_days)
     elif args.command == "create-campaign":
-        create_campaign()
-    elif args.command == "run-weekly":
-        run_weekly()
+        create_campaign(args.max_items, args.lookback_days)
+    elif args.command in {"run-weekly", "run-monthly"}:
+        run_weekly(args.limit_per_source, args.max_items, args.lookback_days)
     return 0

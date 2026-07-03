@@ -2,7 +2,7 @@ from newsletter.models import Article
 from newsletter.render import SECTIONS, render_newsletter
 
 
-def test_newsletter_html_renders_chinese_first_news_sections(tmp_path):
+def test_newsletter_html_renders_original_brief_sections_without_excluded_sections(tmp_path):
     article = Article(
         title="Hong Kong PPP transport update",
         url="https://example.com",
@@ -29,18 +29,17 @@ def test_newsletter_html_renders_chinese_first_news_sections(tmp_path):
 
     subject, html, path = render_newsletter([article, finance_article], tmp_path)
 
-    assert "香港 PPP 每週簡報" in subject
+    assert "Hong Kong PPP Weekly Brief" in subject
+    assert "<h2>Executive Summary</h2>" in html
     for section in SECTIONS:
-        assert section in html
+        assert f"<h2>{section}</h2>" in html
     assert "Market/Finance Notes" not in html
     assert "Further Reading" not in html
     assert "Infrastructure bond market update" not in html
-    assert '<article class="news-item">' in html
-    assert "新聞 1" in html
-    assert 'class="source-link" href="https://example.com">閱讀原文</a>' in html
-    assert html.index("一段繁體中文摘要。") < html.index("A concise English summary.")
-    assert "香港 PPP 交通項目更新" in html
-    assert "一段繁體中文摘要。" in html
+    assert '<div class="item">' in html
+    assert '<span class="label">EN:</span> A concise English summary.' in html
+    assert '<span class="label">繁中:</span> 一段繁體中文摘要。' in html
+    assert '<span class="label">Why it matters:</span> 這會影響基建採購。' in html
     assert path.exists()
 
 
@@ -54,3 +53,22 @@ def test_article_from_row_allows_missing_chinese_title():
     )
 
     assert article.title_zh == ""
+
+
+def test_newsletter_repairs_mojibake_in_existing_articles(tmp_path):
+    article = Article(
+        title="Driving Hong Kongâs development with new transport infrastructure",
+        url="https://example.com",
+        source="Test Source",
+        publish_date="2026-06-18",
+        relevance_score=50,
+        category="Top Hong Kong PPP/Infrastructure Updates",
+        summary_en="Driving Hong Kongâs development with new transport infrastructure",
+        summary_zh="一段繁體中文摘要。",
+        why_it_matters="這會影響基建採購。",
+    )
+
+    _, html, _ = render_newsletter([article], tmp_path)
+
+    assert "Driving Hong Kong’s development with new transport infrastructure" in html
+    assert "Hong Kongâ" not in html

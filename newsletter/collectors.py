@@ -12,6 +12,7 @@ from dateutil import parser as date_parser
 
 from .models import Article, Source
 from .scoring import categorize, score_article
+from .text import repair_mojibake
 
 
 HEADERS = {
@@ -30,7 +31,7 @@ def parse_date(value: str | None) -> str:
 
 def clean_text(value: str) -> str:
     without_tags = re.sub(r"<[^>]+>", " ", value or "")
-    return " ".join(unescape(without_tags).split())
+    return repair_mojibake(" ".join(unescape(without_tags).split()))
 
 
 class LinkExtractor(HTMLParser):

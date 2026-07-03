@@ -8,13 +8,29 @@ from .config import Settings
 from .models import Article
 
 
+FALLBACK_SUMMARY_ZH = "請在發送前由編輯補充中文摘要。"
+FALLBACK_WHY_IT_MATTERS = "可能與香港公私營合作、基建、採購或公共工程發展相關。"
+LEGACY_FALLBACK_WHY_IT_MATTERS = (
+    "Potentially relevant to Hong Kong PPP, infrastructure, procurement, or public works developments."
+)
+
+
+def needs_ai_summary(article: Article) -> bool:
+    return (
+        article.status in {"selected", "new"}
+        or not article.summary_zh.strip()
+        or article.summary_zh.strip() == FALLBACK_SUMMARY_ZH
+        or article.why_it_matters.strip() in {FALLBACK_WHY_IT_MATTERS, LEGACY_FALLBACK_WHY_IT_MATTERS}
+    )
+
+
 def fallback_summary(article: Article) -> Article:
     base = article.excerpt or article.title
     trimmed = base[:260]
     article.title_zh = article.title_zh or article.title
     article.summary_en = trimmed
-    article.summary_zh = "請在發送前由編輯補充中文摘要。"
-    article.why_it_matters = "可能與香港公私營合作、基建、採購或公共工程發展相關。"
+    article.summary_zh = FALLBACK_SUMMARY_ZH
+    article.why_it_matters = FALLBACK_WHY_IT_MATTERS
     article.status = "summarized"
     return article
 
@@ -47,6 +63,9 @@ def summarize_article(article: Article, settings: Settings) -> Article:
                         "You summarize public-private partnership and infrastructure news for a professional Hong Kong newsletter. "
                         "Return strict JSON with title_zh_hant, summary_zh_hant, why_it_matters_zh_hant, and summary_en. "
                         "Use Traditional Chinese as used in Hong Kong for title_zh_hant, summary_zh_hant, and why_it_matters_zh_hant. "
+                        "Make title_zh_hant a concise display headline, not a literal full-title translation. "
+                        "If the original title is long, summarize it so it fits about 3-4 visual lines in a three-column newsletter card: "
+                        "aim for 34-42 Traditional Chinese characters, or 12-16 English words only when English must be retained. "
                         "Do not invent facts beyond the provided metadata/excerpt."
                     ),
                 },
