@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+from datetime import date
 from difflib import SequenceMatcher
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -10,6 +11,16 @@ from .models import Article
 
 TRACKING_PREFIXES = ("utm_",)
 TRACKING_KEYS = {"fbclid", "gclid", "mc_cid", "mc_eid"}
+
+# Evergreen / promotional pages that carry PPP keywords but are not news.
+LOW_VALUE_TERMS = (
+    "tv series", "video series", "promotional video", "video on",
+    "anniversary", "festival", "carnival", "hops", "gala",
+    "exploration centre", "exploration center", "roving exhibition", "exhibition centre",
+    "guided tour", "workshop", "souvenir", "gallery", "photo gallery",
+    "know more about", "social service team", "act early",
+    "challenges and opportunities", "building community",
+)
 
 
 def normalize_url(url: str) -> str:
@@ -37,7 +48,35 @@ def keyword_matches(text: str, keywords: list[str] | None = None) -> list[str]:
     return matches
 
 
+def is_low_value(article: Article) -> bool:
+    """True for evergreen/promotional pages that are not real news."""
+    text = f"{article.title} {article.excerpt}".lower()
+    return any(term in text for term in LOW_VALUE_TERMS)
+
+
+def is_recent(article: Article, days: int) -> bool:
+    """True unless the article has a parseable date older than ``days``.
+
+    Prefers a date recovered from the title/URL slug over the stored
+    ``publish_date`` (which, for legacy rows, is only the collection date and
+    hides the true age). Items with no determinable date are kept.
+    """
+    from .collectors import extract_publish_date  # deferred: avoids import cycle
+
+    recovered = extract_publish_date(article.title, article.url)
+    raw = (recovered or article.publish_date or "").strip()
+    if not raw:
+        return True
+    try:
+        published = date.fromisoformat(raw[:10])
+    except ValueError:
+        return True
+    return (date.today() - published).days <= days
+
+
 def score_article(article: Article, keywords: list[str] | None = None) -> int:
+    if is_low_value(article):
+        return 0
     text = f"{article.title}\n{article.excerpt}"
     matches = keyword_matches(text, keywords)
     score = len(matches) * 10

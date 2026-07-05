@@ -117,6 +117,7 @@ class Settings:
     brevo_sender_email: str | None
     brevo_sender_name: str
     brevo_list_id: int | None
+    recency_days: int
     local_data_dir: Path
 
 
@@ -134,6 +135,7 @@ def load_dotenv(path: Path = Path(".env")) -> None:
 def get_settings() -> Settings:
     load_dotenv()
     brevo_list_id = os.getenv("BREVO_LIST_ID")
+    recency_days = os.getenv("NEWSLETTER_RECENCY_DAYS", "30")
     return Settings(
         openai_api_key=os.getenv("OPENAI_COMPATIBLE_API_KEY"),
         openai_base_url=os.getenv("OPENAI_COMPATIBLE_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
@@ -144,5 +146,6 @@ def get_settings() -> Settings:
         brevo_sender_email=os.getenv("BREVO_SENDER_EMAIL"),
         brevo_sender_name=os.getenv("BREVO_SENDER_NAME", "Hong Kong PPP Weekly"),
         brevo_list_id=int(brevo_list_id) if brevo_list_id and brevo_list_id.isdigit() else None,
+        recency_days=int(recency_days) if recency_days.isdigit() else 30,
         local_data_dir=Path(".newsletter_data"),
     )
