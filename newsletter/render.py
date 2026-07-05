@@ -43,7 +43,6 @@ HTML_TEMPLATE = Template(
 <body>
   <div class="wrap">
     <h1>{{ subject }}</h1>
-    <p class="meta">供編輯審閱的草稿。發送前請核實所有連結及摘要。</p>
 
     <h2>重點摘要</h2>
     <p>{{ executive_summary }}</p>
