@@ -5,11 +5,11 @@ from datetime import date
 
 from .ai import summarize_article
 from .brevo import brevo_config_issues, create_draft_campaign
-from .collectors import collect_from_source
+from .collectors import collect_from_source, is_garbled, is_junk_link
 from .config import get_settings
 from .models import Article
 from .render import EXCLUDED_SECTIONS, SECTIONS, render_newsletter
-from .scoring import dedupe_articles
+from .scoring import dedupe_articles, is_low_value, is_recent
 from .storage import get_store
 
 
@@ -39,6 +39,10 @@ def generate(max_items: int = 12) -> tuple[str, str, str]:
         if article.status in {"selected", "new"} and article.relevance_score >= 10
         and article.category in SECTIONS
         and article.category not in EXCLUDED_SECTIONS
+        and not is_low_value(article)
+        and not is_junk_link(article.url, article.title)
+        and not is_garbled(article.title)
+        and is_recent(article, settings.recency_days)
     ]
     selected = sorted(selected, key=lambda item: item.relevance_score, reverse=True)[:max_items]
     summarized_urls = {article.url for article in selected}
@@ -71,6 +75,10 @@ def create_campaign() -> str:
         if article.status == "summarized"
         and article.category in SECTIONS
         and article.category not in EXCLUDED_SECTIONS
+        and not is_low_value(article)
+        and not is_junk_link(article.url, article.title)
+        and not is_garbled(article.title)
+        and is_recent(article, settings.recency_days)
     ]
     subject, html, html_path = render_newsletter(articles[:12], settings.local_data_dir)
     campaign_id = create_draft_campaign(settings, subject, html)
