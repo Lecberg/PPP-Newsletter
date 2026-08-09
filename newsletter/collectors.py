@@ -204,7 +204,7 @@ def fetch_rss(source: Source, limit: int) -> list[Article]:
     return articles
 
 
-def fetch_html_index(source: Source, limit: int) -> list[Article]:
+def fetch_html_index(source: Source, limit: int, keywords: list[str] | None = None) -> list[Article]:
     response = requests.get(source.url, headers=HEADERS, timeout=25)
     response.raise_for_status()
     # requests defaults charset-less text/html to ISO-8859-1, which mangles
@@ -227,25 +227,25 @@ def fetch_html_index(source: Source, limit: int) -> list[Article]:
         )
     scored = []
     for article in articles:
-        article.relevance_score = score_article(article)
+        article.relevance_score = score_article(article, keywords)
         article.category = categorize(article)
         scored.append(article)
     return sorted(scored, key=lambda item: item.relevance_score, reverse=True)[:limit]
 
 
-def collect_from_source(source: Source, limit: int = 25) -> list[Article]:
+def collect_from_source(source: Source, limit: int = 25, keywords: list[str] | None = None) -> list[Article]:
     if not source.enabled:
         return []
     if source.source_type.lower() == "rss" or source.url.lower().endswith((".xml", "/feed")):
         articles = fetch_rss(source, limit)
     else:
-        articles = fetch_html_index(source, limit)
+        articles = fetch_html_index(source, limit, keywords)
     collected_at = datetime.now(UTC).date().isoformat()
     for article in articles:
         if not article.publish_date:
             article.publish_date = collected_at
         if article.relevance_score == 0:
-            article.relevance_score = score_article(article)
+            article.relevance_score = score_article(article, keywords)
         if not article.category:
             article.category = categorize(article)
         article.status = "selected" if article.relevance_score >= 10 else "rejected"

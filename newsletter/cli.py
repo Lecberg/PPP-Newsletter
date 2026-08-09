@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import argparse
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
 
 from .ai import needs_ai_summary, summarize_article
 from .brevo import brevo_config_issues, create_draft_campaign
 from .collectors import collect_from_source, is_garbled, is_junk_link
-from .config import get_settings
+from .config import get_settings, parse_keywords
 from .models import Article
 from .render import EXCLUDED_SECTIONS, SECTIONS, render_newsletter
+from .schedule import Schedule
 from .scoring import dedupe_articles, is_low_value
 from .storage import get_store
 
@@ -22,10 +23,11 @@ MIN_RELEVANCE_SCORE = 10
 def collect(limit_per_source: int = DEFAULT_LIMIT_PER_SOURCE) -> list[Article]:
     settings = get_settings()
     store = get_store(settings)
+    keywords = parse_keywords(store.read_config().get("keywords"))
     collected: list[Article] = []
     for source in store.read_sources():
         try:
-            collected.extend(collect_from_source(source, limit=limit_per_source))
+            collected.extend(collect_from_source(source, limit=limit_per_source, keywords=keywords))
         except Exception as exc:
             print(f"[warn] source failed: {source.name}: {exc}")
     existing = store.read_articles()
@@ -113,6 +115,53 @@ def run_weekly(
     create_campaign(max_items=max_items, lookback_days=lookback_days)
 
 
+def run_scheduled(
+    limit_per_source: int = DEFAULT_LIMIT_PER_SOURCE,
+    max_items: int = DEFAULT_MAX_ITEMS,
+    lookback_days: int = DEFAULT_LOOKBACK_DAYS,
+    now: datetime | None = None,
+) -> bool:
+    """Run the pipeline only if the current time matches the client's schedule.
+
+    Intended to be invoked hourly by the scheduler (e.g. GitHub Actions). Returns
+    True if the pipeline ran, False if it was skipped.
+    """
+    settings = get_settings()
+    store = get_store(settings)
+    schedule = Schedule.from_config(store.read_config())
+    now = now or datetime.now(timezone.utc)
+
+    if not schedule.matches(now):
+        local = now.astimezone(schedule.tzinfo())
+        print(
+            f"[skip] {local:%Y-%m-%d %H:%M %Z} is outside the delivery slot "
+            f"({schedule.describe()})."
+        )
+        return False
+
+    if _already_ran_today(store, now):
+        print("[skip] an issue was already created today; not drafting again.")
+        return False
+
+    print(f"[run] delivery slot matched ({schedule.describe()}); running pipeline.")
+    run_weekly(
+        limit_per_source=limit_per_source,
+        max_items=max_items,
+        lookback_days=lookback_days,
+    )
+    return True
+
+
+def _already_ran_today(store, now: datetime) -> bool:
+    today = now.date().isoformat()
+    try:
+        issues = store.read_issues()
+    except Exception as exc:  # never let the guard crash the run
+        print(f"[warn] could not read issue history: {exc}")
+        return False
+    return any(str(issue.get("issue_date", "")).strip() == today for issue in issues)
+
+
 def _is_newsletter_candidate(
     article: Article,
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
@@ -159,6 +208,13 @@ def main(argv: list[str] | None = None) -> int:
     monthly_parser.add_argument("--limit-per-source", type=int, default=DEFAULT_LIMIT_PER_SOURCE)
     monthly_parser.add_argument("--max-items", type=int, default=DEFAULT_MAX_ITEMS)
     monthly_parser.add_argument("--lookback-days", type=int, default=DEFAULT_LOOKBACK_DAYS)
+    scheduled_parser = subparsers.add_parser(
+        "run-scheduled",
+        help="Run the pipeline only if the current time matches the Config-tab schedule.",
+    )
+    scheduled_parser.add_argument("--limit-per-source", type=int, default=DEFAULT_LIMIT_PER_SOURCE)
+    scheduled_parser.add_argument("--max-items", type=int, default=DEFAULT_MAX_ITEMS)
+    scheduled_parser.add_argument("--lookback-days", type=int, default=DEFAULT_LOOKBACK_DAYS)
     args = parser.parse_args(argv)
 
     if args.command == "collect":
@@ -169,4 +225,6 @@ def main(argv: list[str] | None = None) -> int:
         create_campaign(args.max_items, args.lookback_days)
     elif args.command in {"run-weekly", "run-monthly"}:
         run_weekly(args.limit_per_source, args.max_items, args.lookback_days)
+    elif args.command == "run-scheduled":
+        run_scheduled(args.limit_per_source, args.max_items, args.lookback_days)
     return 0
