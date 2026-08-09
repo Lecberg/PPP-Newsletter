@@ -6,9 +6,17 @@ from typing import Iterable
 
 from .config import DEFAULT_KEYWORDS, DEFAULT_SOURCES, Settings
 from .models import ARTICLE_HEADERS, CONFIG_HEADERS, ISSUE_HEADERS, SOURCE_HEADERS, Article, Source
+from .schedule import DEFAULT_SCHEDULE
 
 
 SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+
+
+def default_config_rows() -> list[dict[str, str]]:
+    """Seed rows for the Config tab: keywords plus client-editable schedule keys."""
+    rows = [{"key": "keywords", "value": "\n".join(DEFAULT_KEYWORDS)}]
+    rows.extend({"key": key, "value": value} for key, value in DEFAULT_SCHEDULE.items())
+    return rows
 
 
 class LocalStore:
@@ -25,8 +33,22 @@ class LocalStore:
             self.write_rows("Sources", DEFAULT_SOURCES)
         return [Source.from_row(row) for row in self.read_rows("Sources")]
 
+    def read_config(self) -> dict[str, str]:
+        path = self._path("Config")
+        if not path.exists():
+            self.write_rows("Config", default_config_rows())
+        config: dict[str, str] = {}
+        for row in self.read_rows("Config"):
+            key = str(row.get("key", "")).strip()
+            if key:
+                config[key] = str(row.get("value", ""))
+        return config
+
     def read_articles(self) -> list[Article]:
         return [Article.from_row(row) for row in self.read_rows("Articles")]
+
+    def read_issues(self) -> list[dict[str, str]]:
+        return self.read_rows("Issues")
 
     def write_articles(self, articles: Iterable[Article]) -> None:
         self.write_rows("Articles", [article.to_row() for article in articles])
@@ -63,11 +85,21 @@ class SheetStore:
         self._ensure_worksheet("Sources", SOURCE_HEADERS, DEFAULT_SOURCES)
         self._ensure_worksheet("Articles", ARTICLE_HEADERS, [])
         self._ensure_worksheet("Issues", ISSUE_HEADERS, [])
-        self._ensure_worksheet(
-            "Config",
-            CONFIG_HEADERS,
-            [{"key": "keywords", "value": "\n".join(DEFAULT_KEYWORDS)}],
-        )
+        self._ensure_worksheet("Config", CONFIG_HEADERS, default_config_rows())
+        self._ensure_config_keys(DEFAULT_SCHEDULE)
+
+    def _ensure_config_keys(self, defaults: dict[str, str]) -> None:
+        """Append any missing schedule keys so the client has rows to edit."""
+        worksheet = self.sheet.worksheet("Config")
+        existing = {
+            str(row.get("key", "")).strip()
+            for row in worksheet.get_all_records()
+        }
+        missing = [
+            [key, value] for key, value in defaults.items() if key not in existing
+        ]
+        if missing:
+            worksheet.append_rows(missing)
 
     def _ensure_worksheet(self, title: str, headers: list[str], seed_rows: list[dict]) -> None:
         try:
@@ -84,8 +116,19 @@ class SheetStore:
     def read_sources(self) -> list[Source]:
         return [Source.from_row(row) for row in self.sheet.worksheet("Sources").get_all_records()]
 
+    def read_config(self) -> dict[str, str]:
+        config: dict[str, str] = {}
+        for row in self.sheet.worksheet("Config").get_all_records():
+            key = str(row.get("key", "")).strip()
+            if key:
+                config[key] = str(row.get("value", ""))
+        return config
+
     def read_articles(self) -> list[Article]:
         return [Article.from_row(row) for row in self.sheet.worksheet("Articles").get_all_records()]
+
+    def read_issues(self) -> list[dict[str, str]]:
+        return self.sheet.worksheet("Issues").get_all_records()
 
     def write_articles(self, articles: Iterable[Article]) -> None:
         worksheet = self.sheet.worksheet("Articles")

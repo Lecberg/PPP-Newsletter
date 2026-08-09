@@ -3,8 +3,10 @@ name: Hong Kong PPP Weekly Newsletter
 on:
   workflow_dispatch:
   schedule:
-    # Monday 08:00 Hong Kong time.
-    - cron: "0 0 * * 1"
+    # Runs hourly; the client controls the actual delivery day/time from the
+    # Config tab of the Google Sheet. `run-scheduled` exits early unless the
+    # current hour matches the configured slot.
+    - cron: "0 * * * *"
 
 jobs:
   draft-newsletter:
@@ -27,4 +29,4 @@ jobs:
           BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
           BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
           BREVO_LIST_ID: ${{ secrets.BREVO_LIST_ID }}
-        run: python -m newsletter run-weekly
+        run: python -m newsletter run-scheduled

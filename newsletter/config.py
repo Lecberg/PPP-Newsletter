@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -104,6 +105,20 @@ DEFAULT_SOURCES = [
         "enabled": "TRUE",
     },
 ]
+
+
+def parse_keywords(value: str | None) -> list[str]:
+    """Parse the client-editable ``keywords`` Config value into a keyword list.
+
+    Accepts keywords separated by newlines or commas (ASCII or full-width),
+    so a non-technical client can edit the spreadsheet cell freely. Falls back
+    to :data:`DEFAULT_KEYWORDS` when the value is empty or missing.
+    """
+    if not value:
+        return list(DEFAULT_KEYWORDS)
+    parts = re.split(r"[\n,，]", value)
+    keywords = [part.strip() for part in parts if part.strip()]
+    return keywords or list(DEFAULT_KEYWORDS)
 
 
 @dataclass(frozen=True)
