@@ -1,6 +1,6 @@
 # Verification record
 
-Checked on 3 October 2026, using Hong Kong time.
+Checked on 3–4 October 2026, using Hong Kong time.
 
 ## Automated checks
 
@@ -60,12 +60,13 @@ Created the `NEWSLETTER_NAME` text field in Brevo. No contact records changed.
 
 ## Cloud deployment setup — 4 October 2026
 
-The Vercel command-line tool is now signed in. Created `ppp-newsletter-portal` with root `portal/` and Node.js 22.
+The Vercel command-line tool is now signed in. Created `ppp-newsletter-portal` with root `portal/`.
+The application requires Node.js 22 or newer. Vercel's builds selected Node.js 24.
 Its install and build commands use the project's pinned pnpm version through Corepack.
-Both cloud builds passed. Functions run in Hong Kong.
+Production and preview cloud builds passed. Functions run in Hong Kong.
 
 - Production address: `https://ppp-newsletter-portal.vercel.app`
-- Separate preview: `https://ppp-newsletter-portal-jvgco6a1d-ryan-mas-projects-71fa00c3.vercel.app`
+- Stable preview: `https://ppp-newsletter-preview-71fa00c3.vercel.app`
 
 Vercel assigned the first deployment to production automatically. That deployment remains a setup screen with Google login disabled.
 The owner must finish the pending setup and live checks before sharing it with the client.
@@ -73,11 +74,26 @@ All seven protected production routes returned HTTP 401 and private, no-store he
 The homepage redirected to login. No real email was sent.
 
 Production credentials for Brevo and Sheets are configured as server secrets. Both approved addresses are configured.
-Sending remains disabled. Preview has its own session secret and has no production Brevo, Sheet, or database credentials.
+Sending remains disabled. Preview has its own session secret and a separate database.
+Its recipient controls use a separate Brevo test list. The production list is never selected for previews.
 The deployment upload contains only portal files. Environment files, Python output, dependencies, and draft files are excluded.
 
-Neon's free plan in Singapore is selected for the production database. Installation awaits the owner's terms acceptance.
-Google sign-in's app configuration is prepared in the existing `hk-ppp-newsletter` project. It awaits the owner's policy acceptance.
-Google web login credentials and `DATABASE_URL` are still missing.
-Neon migration, real Google sign-in, database concurrency tests, and controlled live delivery remain pending.
+The owner accepted Neon's terms. Production and preview each have their own free database in Singapore.
+Both databases have the additive portal tables. Their migrations passed.
+Six checks passed against the real preview database. They covered concurrent locks, complete saved reviews,
+retained approval history, status updates, competing server requests, and uncertain sends across server instances.
+These checks used fake Brevo and Sheets providers. They sent no email and removed their synthetic database records.
+The usual test run skips these six checks unless explicitly enabled against the preview database.
+
+Created an empty controlled test list in Brevo, separate from production's configured list.
+Verified that the test list has zero contacts. No live contacts were changed.
+Google's app policy is accepted in the existing `hk-ppp-newsletter` project.
+The web login form is prepared with production, stable preview, and local callback addresses.
+Its final credential creation awaits the owner. Real Google login and controlled delivery remain pending.
+Created a separate test Google Sheet through the owner's browser, using the same five Issues headers.
+Confirmed that the existing server account can read it. Created one bilingual controlled test draft.
+Brevo requires a contact before the test list can be assigned to that draft.
+The owner's controlled recipient address remains pending. No test email has been sent.
+The latest preview uses the isolated resources. Its seven protected routes also returned HTTP 401
+and private, no-store headers without a portal session.
 GitHub's portal checks passed for draft pull request #3. The main branch remains unchanged.

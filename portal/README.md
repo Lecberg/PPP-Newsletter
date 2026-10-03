@@ -39,7 +39,9 @@ This mode cannot run in production or on Vercel, including preview deployments.
 
 The project now exists at `https://ppp-newsletter-portal.vercel.app`.
 Its current deployment shows the login setup screen. Client access is not ready yet.
-Neon terms acceptance and Google sign-in setup remain pending. Sending is disabled.
+Production and preview have separate Neon databases. Their portal tables are ready.
+Google's app policy is accepted. Its web login credential still needs creation.
+Sending remains disabled until real login and controlled delivery checks pass.
 See `docs/verification.md` for completed checks and remaining setup.
 
 The implementation is on `codex/newsletter-portal`, with draft pull request #3.
@@ -70,6 +72,8 @@ vercel deploy --prod --yes --scope ryan-mas-projects-71fa00c3
 The root `.vercelignore` limits uploads to portal files and excludes every local environment file.
 Set production `AUTH_URL` to `https://ppp-newsletter-portal.vercel.app`.
 Register `https://ppp-newsletter-portal.vercel.app/api/auth/callback/google` with Google.
+Preview uses `https://ppp-newsletter-preview-71fa00c3.vercel.app`.
+Register that address with `/api/auth/callback/google` appended for preview login.
 
 Credentials stay on the server. Do not put them in variables beginning with `NEXT_PUBLIC_`.
 The portal does not need the AI generation key. The Python GitHub Actions workflow keeps generating drafts.
@@ -146,3 +150,14 @@ pnpm build
 Automated checks cover access rules, deployment isolation, stale reviews, shared locks,
 duplicate sends, unknown outcomes, recipient ownership, and unsubscribe protection.
 `docs/verification.md` records browser checks and remaining external setup.
+
+Six additional checks run against the isolated preview database when explicitly enabled.
+They use fake newsletter providers and never send email.
+
+```powershell
+$env:PORTAL_LIVE_DATABASE_TESTS = 'true'
+node --env-file=.env.preview.local node_modules/vitest/vitest.mjs run tests/neon.integration.test.ts
+Remove-Item Env:PORTAL_LIVE_DATABASE_TESTS
+```
+
+Use the preview database only. Each check removes its own synthetic records afterward.
