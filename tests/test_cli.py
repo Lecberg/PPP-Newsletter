@@ -1,9 +1,23 @@
 from pathlib import Path
+from datetime import date
+
+import pytest
 
 from newsletter.ai import FALLBACK_SUMMARY_ZH, LEGACY_FALLBACK_WHY_IT_MATTERS
 from newsletter.cli import DEFAULT_LIMIT_PER_SOURCE, DEFAULT_MAX_ITEMS, DEFAULT_LOOKBACK_DAYS, generate
 from newsletter.config import Settings
 from newsletter.models import Article
+
+
+@pytest.fixture(autouse=True)
+def fixed_newsletter_date(monkeypatch):
+    """Keep the news-age checks stable as the real calendar advances."""
+    class FixedDate(date):
+        @classmethod
+        def today(cls):
+            return cls(2026, 6, 20)
+
+    monkeypatch.setattr("newsletter.cli.date", FixedDate)
 
 
 class FakeStore:

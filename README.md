@@ -2,7 +2,14 @@
 
 This project collects Hong Kong public-private partnership and infrastructure news, filters and deduplicates articles, generates an English + Traditional Chinese newsletter draft with an OpenAI-compatible API, stores workflow data in Google Sheets, and creates a draft Brevo campaign for human review.
 
-The MVP never auto-sends email. A reviewer approves and sends the campaign inside Brevo.
+The system never auto-sends email. A reviewer confirms delivery in the private
+portal or sends the campaign inside Brevo.
+
+The new [private portal](portal/README.md) lets the owner and one client review drafts,
+manage newsletter recipients, and approve immediate delivery through Brevo.
+It lives in `portal/` and deploys separately on Vercel. Google Sheets still controls
+sources, keywords, and draft scheduling. Portal delivery stays disabled until setup
+and a controlled test delivery are complete.
 
 ## Setup
 
