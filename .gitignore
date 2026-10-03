@@ -5,3 +5,6 @@ __pycache__/
 .newsletter_data/
 *.pyc
 *.egg-info/
+
+.vercel
+.env*

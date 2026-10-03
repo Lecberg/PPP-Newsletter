@@ -37,6 +37,14 @@ This mode cannot run in production or on Vercel, including preview deployments.
 
 ## Deploy to Vercel
 
+The project now exists at `https://ppp-newsletter-portal.vercel.app`.
+Its current deployment shows the login setup screen. Client access is not ready yet.
+Neon terms acceptance and Google sign-in setup remain pending. Sending is disabled.
+See `docs/verification.md` for completed checks and remaining setup.
+
+The implementation is on `codex/newsletter-portal`, with draft pull request #3.
+The main branch remains unchanged. Deploy this branch manually until it is merged.
+
 1. Sign in to Vercel. The Codex connection can read account data, but its deployment tool is currently unavailable.
 2. Create `ppp-newsletter-portal` in the owner's account. Import this repository and set its root directory to `portal`.
 3. Connect Neon through Vercel Marketplace. Use a separate database for previews.
@@ -49,6 +57,19 @@ This mode cannot run in production or on Vercel, including preview deployments.
 10. Keep `PORTAL_SEND_ENABLED=false` until login and test delivery have been verified.
 11. Deploy, check the build, and verify that other Google accounts cannot open private pages or call the server routes.
 12. After the controlled delivery test passes, enable production delivery and redeploy.
+
+For command-line deployment, run from the repository root because the project root is `portal/`:
+
+```powershell
+vercel link --yes --scope ryan-mas-projects-71fa00c3 --project ppp-newsletter-portal
+vercel deploy --target preview --yes --scope ryan-mas-projects-71fa00c3
+# After login, database, and controlled delivery checks pass:
+vercel deploy --prod --yes --scope ryan-mas-projects-71fa00c3
+```
+
+The root `.vercelignore` limits uploads to portal files and excludes every local environment file.
+Set production `AUTH_URL` to `https://ppp-newsletter-portal.vercel.app`.
+Register `https://ppp-newsletter-portal.vercel.app/api/auth/callback/google` with Google.
 
 Credentials stay on the server. Do not put them in variables beginning with `NEXT_PUBLIC_`.
 The portal does not need the AI generation key. The Python GitHub Actions workflow keeps generating drafts.

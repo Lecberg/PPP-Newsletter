@@ -58,9 +58,26 @@ The Issues sheet has the expected columns. Brevo's report uses `lists`, `exclusi
 Added support for these report fields alongside the campaign creation field names.
 Created the `NEWSLETTER_NAME` text field in Brevo. No contact records changed.
 
-Vercel's account connection responds again, but its deployment tool returns "Tool deploy_to_vercel not found."
-Deployment remains pending until command-line deployment access is available.
-The Vercel website also requires sign-in. Its login tab is open for the owner.
-Google web login credentials and `DATABASE_URL` are also missing.
-Neon migration, real Google sign-in, database concurrency tests, and controlled live delivery need those services configured.
-Production delivery remains disabled.
+## Cloud deployment setup — 4 October 2026
+
+The Vercel command-line tool is now signed in. Created `ppp-newsletter-portal` with root `portal/` and Node.js 22.
+Its install and build commands use the project's pinned pnpm version through Corepack.
+Both cloud builds passed. Functions run in Hong Kong.
+
+- Production address: `https://ppp-newsletter-portal.vercel.app`
+- Separate preview: `https://ppp-newsletter-portal-jvgco6a1d-ryan-mas-projects-71fa00c3.vercel.app`
+
+Vercel assigned the first deployment to production automatically. That deployment remains a setup screen with Google login disabled.
+The owner must finish the pending setup and live checks before sharing it with the client.
+All seven protected production routes returned HTTP 401 and private, no-store headers when called without a portal session.
+The homepage redirected to login. No real email was sent.
+
+Production credentials for Brevo and Sheets are configured as server secrets. Both approved addresses are configured.
+Sending remains disabled. Preview has its own session secret and has no production Brevo, Sheet, or database credentials.
+The deployment upload contains only portal files. Environment files, Python output, dependencies, and draft files are excluded.
+
+Neon's free plan in Singapore is selected for the production database. Installation awaits the owner's terms acceptance.
+Google sign-in's app configuration is prepared in the existing `hk-ppp-newsletter` project. It awaits the owner's policy acceptance.
+Google web login credentials and `DATABASE_URL` are still missing.
+Neon migration, real Google sign-in, database concurrency tests, and controlled live delivery remain pending.
+GitHub's portal checks passed for draft pull request #3. The main branch remains unchanged.
