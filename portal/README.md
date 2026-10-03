@@ -38,9 +38,11 @@ This mode cannot run in production or on Vercel, including preview deployments.
 ## Deploy to Vercel
 
 The project now exists at `https://ppp-newsletter-portal.vercel.app`.
-Its current deployment shows the login setup screen. Client access is not ready yet.
+Its current deployment has Google sign-in enabled. Client access still needs the final account checks.
 Production and preview have separate Neon databases. Their portal tables are ready.
-Google's app policy is accepted. Its web login credential still needs creation.
+Google's app policy is accepted. Its web login credential is configured privately in Vercel.
+Google rejected both originally supplied addresses as test users. They need active Google accounts,
+or the owner must provide their two existing Google sign-in addresses.
 Sending remains disabled until real login and controlled delivery checks pass.
 See `docs/verification.md` for completed checks and remaining setup.
 
@@ -51,7 +53,7 @@ The main branch remains unchanged. Deploy this branch manually until it is merge
 2. Create `ppp-newsletter-portal` in the owner's account. Import this repository and set its root directory to `portal`.
 3. Connect Neon through Vercel Marketplace. Use a separate database for previews.
 4. Configure the variables listed in `.env.example` privately in Vercel's project settings.
-5. Set `PORTAL_ALLOWED_EMAILS` to exactly the owner's and client's Google addresses, separated by a comma.
+5. Set `PORTAL_ALLOWED_EMAILS` to exactly the owner's and client's active Google addresses, separated by a comma.
 6. Set `PORTAL_OWNER_EMAIL` to the owner's address. Both accounts have the same portal controls.
 7. Create a Google web login client. Register `https://<production-host>/api/auth/callback/google` as its redirect address.
 8. Set `AUTH_URL` to `https://<production-host>`. Register `http://localhost:3000/api/auth/callback/google` for local login if needed.

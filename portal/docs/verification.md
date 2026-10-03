@@ -68,10 +68,11 @@ Production and preview cloud builds passed. Functions run in Hong Kong.
 - Production address: `https://ppp-newsletter-portal.vercel.app`
 - Stable preview: `https://ppp-newsletter-preview-71fa00c3.vercel.app`
 
-Vercel assigned the first deployment to production automatically. That deployment remains a setup screen with Google login disabled.
-The owner must finish the pending setup and live checks before sharing it with the client.
+The current production deployment has Google sign-in enabled. The owner must finish account and delivery checks before sharing it with the client.
 All seven protected production routes returned HTTP 401 and private, no-store headers when called without a portal session.
-The homepage redirected to login. No real email was sent.
+The homepage redirected to login. A real Google sign-in with an unapproved account returned `AccessDenied`.
+That account received no portal access. Google requested only name, profile picture, and email.
+No real newsletter email was sent.
 
 Production credentials for Brevo and Sheets are configured as server secrets. Both approved addresses are configured.
 Sending remains disabled. Preview has its own session secret and a separate database.
@@ -88,8 +89,12 @@ The usual test run skips these six checks unless explicitly enabled against the 
 Created an empty controlled test list in Brevo, separate from production's configured list.
 Verified that the test list has zero contacts. No live contacts were changed.
 Google's app policy is accepted in the existing `hk-ppp-newsletter` project.
-The web login form is prepared with production, stable preview, and local callback addresses.
-Its final credential creation awaits the owner. Real Google login and controlled delivery remain pending.
+The owner created the web login credential. Production, stable preview, and local callback addresses are registered.
+Stored the credential privately in Vercel for production and preview, then redeployed both environments successfully.
+Google rejected `frankie.wong@todplus.com` as an ineligible test account.
+It also rejected `u3664746@connect.hku.hk` because it requires an active Google account.
+The application's original two-address allowlist remains unchanged.
+Approved-account login checks and controlled delivery remain pending the owner's account clarification and test address.
 Created a separate test Google Sheet through the owner's browser, using the same five Issues headers.
 Confirmed that the existing server account can read it. Created one bilingual controlled test draft.
 Brevo requires a contact before the test list can be assigned to that draft.
