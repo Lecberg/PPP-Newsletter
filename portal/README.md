@@ -39,10 +39,10 @@ This mode cannot run in production or on Vercel, including preview deployments.
 
 The project now exists at `https://ppp-newsletter-portal.vercel.app`.
 Email login reuses Brevo's individual email service and the existing verified sender.
-The new login is currently deployed to preview. Production release awaits Brevo server access approval.
-Brevo's server-address restriction blocks Vercel's changing outgoing addresses.
-The owner must approve removing that account-wide restriction or provide a stable outgoing address.
-The secret Brevo key remains required in either case. Local setup checks do not prove Vercel has access.
+Email login is deployed to production and preview.
+The owner approved removing Brevo's account-wide server-address restriction on 4 October 2026.
+This permits Vercel's changing outgoing addresses. The secret Brevo key remains required.
+Both deployments successfully submitted login emails for the two approved addresses.
 Production and preview have separate Neon databases and login secrets.
 Login links work once and expire in ten minutes. Each login lasts up to eight hours.
 Old Google login sessions are rejected. Sending remains disabled until controlled delivery checks pass.
@@ -69,7 +69,7 @@ For command-line deployment, run from the repository root because the project ro
 ```powershell
 vercel link --yes --scope ryan-mas-projects-71fa00c3 --project ppp-newsletter-portal
 vercel deploy --target preview --yes --scope ryan-mas-projects-71fa00c3
-# After login, database, and controlled delivery checks pass:
+# After preview login and database checks pass; keep newsletter sending disabled:
 vercel deploy --prod --yes --scope ryan-mas-projects-71fa00c3
 ```
 

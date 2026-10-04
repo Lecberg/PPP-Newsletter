@@ -140,3 +140,20 @@ Keeping the restriction requires a stable outgoing server address rather than th
 The confirmation dialog is prepared but has not been submitted.
 Google login secrets remain available for recovery until the replacement passes cloud delivery checks.
 Actual inbox-link confirmation by both people remains pending. Controlled newsletter delivery remains pending separately.
+
+## Email login release — 4 October 2026
+
+The owner explicitly approved removing Brevo's account-wide server-address restriction.
+The account's Authorized IPs page now shows API blocking deactivated. API keys are still required.
+Preview login emails for both approved addresses have Brevo delivered events.
+The owner confirmed that the preview email link opened the portal successfully.
+Production was then deployed with its own database and login secret, using the stable production address.
+Both production login requests returned HTTP 202. Public login checks and all seven protected-route checks pass.
+The production page displays the email form with the approved white and navy design.
+GitHub's checks passed for commit 3def018eae64c60a6a341c1decf35a82ad130594.
+The owner confirmed production email login and access to both Newsletter and Recipients.
+Removed AUTH_GOOGLE_ID and AUTH_GOOGLE_SECRET from production and preview Vercel settings.
+Kept the Google server credentials used for Sheets. The old web login credential backup remains private for recovery.
+Both real inboxes have delivered preview messages; one person has confirmed the complete preview and production flows.
+The other person's individual inbox confirmation remains an operational follow-up.
+Newsletter sending remains disabled. The controlled newsletter delivery test remains a separate pending task.
