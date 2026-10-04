@@ -190,3 +190,13 @@ Screenshots are saved outside the repository as `recipient-selection-desktop.png
 Browser checks used explicitly marked local demonstration data. They changed no real subscriber choices.
 Actual newsletter delivery with chosen recipients still requires the separate controlled delivery test.
 Sending stays disabled in both cloud environments.
+
+Preview and production cloud builds passed for recipient choices at commit `d52a0ab76c3dd060161f3e5c07792e10e7735324`.
+The stable preview points to `dpl_FAxGAW89DrLncPEDXvjk9afKC9T2`.
+Production points to `dpl_2T2gsfadwAjsMVW7CCXK4F5GaLMG` at the existing production address.
+All nine protected routes in both environments returned HTTP 401 and private, no-store headers without login.
+These checks include the new issue-recipient read and choice-update routes.
+The live production browser opened the existing email login screen correctly after deployment.
+GitHub's Newsletter Portal Checks passed for the implementation commit.
+Authenticated checkbox behavior was checked locally. It has not yet been checked in a real user's cloud session.
+No real newsletter, subscription, or recipient choice changed during this release.
