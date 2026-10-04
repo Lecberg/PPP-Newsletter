@@ -223,3 +223,17 @@ Sending still rechecks fresh content, targeting, recipients, and approvals under
 Rate-limit errors now show the provider's reset time and do not repeat requests.
 All 114 ordinary portal tests and the local production build passed after these changes.
 The 14 opt-in database checks and 33 Python checks passed earlier; these changes do not alter their tables or Python code.
+
+The owner chose to wait until returning before retrying the two newsletters. No automatic retry was scheduled.
+Both cloud environments now have `PORTAL_SEND_ENABLED=false`, confirmed from fresh environment downloads.
+Removed the unaliased temporary preview deployment that had test sending enabled.
+Preview and production rebuilt successfully at implementation commit `e4acea009cfa2cab22b53504bcb3fa5bf87cdc5f`.
+Stable preview uses `dpl_5deji8F8FcimoxPDqNvkMh64qnEJ`. Production uses `dpl_CAKiyzDJbWE9GHfDAWfbvNXzKHBb`.
+All nine protected-route checks passed in each environment. GitHub's implementation checks passed.
+Local browser checks confirmed that choices, switching issues, and the final confirmation still work.
+Local request logs confirmed that choice updates and switching issues do not reload the complete history.
+The original preview login tab opened the portal when navigating to its homepage, using the completed login session.
+Refreshing `/login` alone retains its login form; the new email-link tab is the normal completed-login tab.
+The signed-in preview displayed the new request-limit message. The summary endpoint reported a reset at 16:00 Hong Kong time.
+Campaign detail requests previously reported a reset around 16:03. Recheck after 16:05 before resuming.
+Screenshot: `controlled-delivery-limit.png`, saved outside the repository.
