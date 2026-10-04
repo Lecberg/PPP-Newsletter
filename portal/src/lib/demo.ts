@@ -42,9 +42,9 @@ export class DemoBrevo implements BrevoPort {
   exclusionLists = new Map<number, number[]>();
   async createExclusionList() { const id = 10000 + this.exclusionLists.size; this.exclusionLists.set(id, []); return id; }
   async setExcludedContacts(listId: number, ids: number[]) { this.exclusionLists.set(listId, [...ids]); }
-  async target(id: number, listId: number, exclusionListId: number | null) {
+  async target(id: number, listId: number, exclusionListId: number) {
     const campaign = this.campaigns.find(c => c.id === id);
-    if (campaign) campaign.recipients = { listIds: [listId], exclusionListIds: exclusionListId ? [exclusionListId] : [] };
+    if (campaign) campaign.recipients = { listIds: [listId], exclusionListIds: [exclusionListId] };
   }
   campaigns: Campaign[] = [{ id: 101, subject: "Hong Kong PPP Weekly — 3 October 2026", htmlContent: demoHtml, status: "draft", recipients: { listIds: [999] }, sender: { email: "newsletter@example.com" }, type: "classic" },
     { id: 100, subject: "Hong Kong PPP Weekly — 26 September 2026", htmlContent: demoHtml.replace("3 October 2026", "26 September 2026").replace("2026年10月3日", "2026年9月26日"), status: "sent", recipients: { listIds: [999] }, type: "classic" }];

@@ -172,18 +172,18 @@ export class PortalService {
       // This private exclusion list belongs only to this campaign, never future issues.
       if (exclusionListId) {
         await this.brevo.setExcludedContacts(exclusionListId, excludedIds);
-        await this.brevo.target(id, listId, excludedIds.length ? exclusionListId : null);
+        await this.brevo.target(id, listId, exclusionListId);
         const [prepared, freshContacts] = await Promise.all([this.brevo.campaign(id), this.brevo.contacts(listId)]);
         validateCampaign(prepared, listId, exclusionListId);
         const targetings = [prepared.recipients?.exclusionListIds, prepared.recipients?.exclusionLists].filter(ids => ids !== undefined);
-        if (!targetings.length || targetings.some(ids => ids.length !== (excludedIds.length ? 1 : 0) || (excludedIds.length && ids[0] !== exclusionListId))) throw new PortalError(409, "Brevo did not confirm the selected recipients. No send was requested.");
+        if (!targetings.length || targetings.some(ids => ids.length !== 1 || ids[0] !== exclusionListId)) throw new PortalError(409, "Brevo did not confirm the selected recipients. No send was requested.");
         if (fingerprint({ ...snapshot, campaign: { ...prepared, recipients: campaign.recipients }, recipients: freshContacts.map(c => recipient(c, listId)) }) !== reviewedFingerprint) {
           throw new PortalError(409, "The draft or recipients changed during preparation. Refresh and review again.");
         }
       }
       // This durable record is committed BEFORE any external send request.
       await this.store.begin({ campaignId: id, listId, approvedBy: actor, fingerprint: freshFingerprint,
-        snapshot: { ...snapshot, deliveryTarget: { exclusionListId: excludedIds.length ? exclusionListId : null } }, outcome: "submitting" });
+        snapshot: { ...snapshot, deliveryTarget: { exclusionListId } }, outcome: "submitting" });
       try { await this.brevo.send(id); }
       catch (error) {
         const definite = error instanceof BrevoError && error.definite;

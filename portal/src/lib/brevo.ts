@@ -77,8 +77,9 @@ export class BrevoClient implements BrevoPort {
     const actual = (await this.contacts(listId)).map(c => c.id);
     if (actual.length !== wanted.size || actual.some(id => !wanted.has(id))) throw new PortalError(409, "Brevo has not confirmed the recipient choices. Refresh before sending.");
   }
-  async target(id: number, listId: number, exclusionListId: number | null) {
-    await this.request(`/emailCampaigns/${id}`, "PUT", { recipients: { listIds: [listId], exclusionListIds: exclusionListId ? [exclusionListId] : [] } });
+  async target(id: number, listId: number, exclusionListId: number) {
+    // Brevo rejects exclusionListIds: []. Keep the owned list even when it has no members.
+    await this.request(`/emailCampaigns/${id}`, "PUT", { recipients: { listIds: [listId], exclusionListIds: [exclusionListId] } });
   }
   async send(id: number) { await this.request(`/emailCampaigns/${id}/sendNow`, "POST"); }
 }

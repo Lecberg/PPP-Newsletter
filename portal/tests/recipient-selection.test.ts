@@ -82,6 +82,22 @@ describe("per-issue receiver choices", () => {
     expect(send).not.toHaveBeenCalled(); expect(await store.approval(101)).toBeNull();
     expect((await store.selection(101, 999)).exclusionListId).not.toBeNull();
   });
+  it("keeps the owned exclusion list empty when all recipients are selected again after preparation fails", async () => {
+    await choose(1, false);
+    const initial = await service.issue(101), realTarget = brevo.target.bind(brevo);
+    const target = vi.spyOn(brevo, "target").mockImplementationOnce(async (...args) => {
+      await realTarget(...args); throw new BrevoError(0, false, "Preparation timeout");
+    });
+    await expect(service.send("owner", 101, initial.fingerprint)).rejects.toThrow("timeout");
+    const managedId = (await store.selection(101, 999)).exclusionListId!;
+    await choose(1, true);
+    const review = await service.issue(101);
+    expect(review.eligibleCount).toBe(2);
+    await service.send("owner", 101, review.fingerprint);
+    expect(target).toHaveBeenLastCalledWith(101, 999, managedId);
+    expect(brevo.exclusionLists.get(managedId)).toEqual([]);
+    expect((await store.approval(101))?.snapshot.deliveryTarget).toEqual({ exclusionListId: managedId });
+  });
   it("refuses delivery unless Brevo confirms the exact exclusion target", async () => {
     await choose(1, false);
     const review = await service.issue(101), send = vi.spyOn(brevo, "send");

@@ -29,7 +29,7 @@ export interface BrevoPort {
   remove(listId: number, id: number): Promise<void>;
   createExclusionList(listId: number, campaignId: number): Promise<number>;
   setExcludedContacts(listId: number, ids: number[]): Promise<void>;
-  target(id: number, listId: number, exclusionListId: number | null): Promise<void>;
+  target(id: number, listId: number, exclusionListId: number): Promise<void>;
   send(id: number): Promise<void>;
 }
 export interface SheetPort {
