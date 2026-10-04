@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@auth/neon-adapter':
+        specifier: ^1.11.3
+        version: 1.11.3(@neondatabase/serverless@1.2.0)
       '@neondatabase/serverless':
         specifier: ^1.0.2
         version: 1.2.0
@@ -64,6 +67,25 @@ packages:
         optional: true
       nodemailer:
         optional: true
+
+  '@auth/core@0.41.3':
+    resolution: {integrity: sha512-sJ3JMHHkXMD3aOjopv7mOBTO1Ocw4b0fAEXJBz6k7YHLpYQI6C40jCUPc5fNvUKxXRXNE1/sRISA15UrwWJBTw==}
+    peerDependencies:
+      '@simplewebauthn/browser': ^9.0.1
+      '@simplewebauthn/server': ^9.0.2
+      nodemailer: ^7.0.7 || ^8.0.5
+    peerDependenciesMeta:
+      '@simplewebauthn/browser':
+        optional: true
+      '@simplewebauthn/server':
+        optional: true
+      nodemailer:
+        optional: true
+
+  '@auth/neon-adapter@1.11.3':
+    resolution: {integrity: sha512-NbSd/sTQjvCdbhzTWxiXBSzLfOcvET0i5qD1Bvm9rIkvTFI85NX3/SfEaBlUt3M1clFmUafSTV90DtytXVgIcQ==}
+    peerDependencies:
+      '@neondatabase/serverless': ^0.10.4 || ^1.0.0
 
   '@emnapi/runtime@1.11.3':
     resolution: {integrity: sha512-Xz4Tpyki7XyrpbUK1jR1AhdAdaXyhhY4lZ3neLodmhpuWfy2PAQN5B46sAiU4liOXGLkHypn/qU+jvfWSCYYLA==}
@@ -1076,6 +1098,23 @@ snapshots:
       oauth4webapi: 3.8.8
       preact: 10.24.3
       preact-render-to-string: 6.5.11(preact@10.24.3)
+
+  '@auth/core@0.41.3':
+    dependencies:
+      '@panva/hkdf': 1.2.1
+      jose: 6.2.12
+      oauth4webapi: 3.8.8
+      preact: 10.24.3
+      preact-render-to-string: 6.5.11(preact@10.24.3)
+
+  '@auth/neon-adapter@1.11.3(@neondatabase/serverless@1.2.0)':
+    dependencies:
+      '@auth/core': 0.41.3
+      '@neondatabase/serverless': 1.2.0
+    transitivePeerDependencies:
+      - '@simplewebauthn/browser'
+      - '@simplewebauthn/server'
+      - nodemailer
 
   '@emnapi/runtime@1.11.3':
     dependencies:

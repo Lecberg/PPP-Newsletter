@@ -1,7 +1,7 @@
 import { GoogleAuth } from 'google-auth-library';
 import { neon } from '@neondatabase/serverless';
 let failed = false;
-const keys = ['AUTH_SECRET', 'AUTH_GOOGLE_ID', 'AUTH_GOOGLE_SECRET', 'PORTAL_ALLOWED_EMAILS', 'PORTAL_OWNER_EMAIL', 'AUTH_URL', 'BREVO_API_KEY', 'BREVO_LIST_ID', 'GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_SHEET_ID', 'DATABASE_URL'];
+const keys = ['AUTH_SECRET', 'AUTH_EMAIL_SENDER_ID', 'PORTAL_ALLOWED_EMAILS', 'PORTAL_OWNER_EMAIL', 'AUTH_URL', 'BREVO_API_KEY', 'BREVO_LIST_ID', 'GOOGLE_SERVICE_ACCOUNT_JSON', 'GOOGLE_SHEET_ID', 'DATABASE_URL'];
 for (const key of keys) if (!process.env[key]) { console.log('Missing: ' + key); failed = true; }
 const addresses = (process.env.PORTAL_ALLOWED_EMAILS || '').split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
 if (addresses.length !== 2 || new Set(addresses).size !== 2 || !addresses.includes(process.env.PORTAL_OWNER_EMAIL?.toLowerCase())) { console.log('Check the two allowed accounts and the owner account.'); failed = true; }
@@ -15,6 +15,10 @@ if (process.env.BREVO_API_KEY && process.env.BREVO_LIST_ID) await check('Brevo',
   if (!list.ok) throw new Error('List unavailable');
   const fields = await fetch('https://api.brevo.com/v3/contacts/attributes', { headers, signal: AbortSignal.timeout(15000) });
   if (!fields.ok || !(await fields.json()).attributes.some(a => a.name === 'NEWSLETTER_NAME' && a.type === 'text' && a.category === 'normal')) throw new Error('Name field unavailable');
+  const account = await fetch('https://api.brevo.com/v3/account', { headers, signal: AbortSignal.timeout(15000) });
+  if (!account.ok || !(await account.json()).relay?.enabled) throw new Error('Login email service unavailable');
+  const senders = await fetch('https://api.brevo.com/v3/senders', { headers, signal: AbortSignal.timeout(15000) });
+  if (!senders.ok || !(await senders.json()).senders?.some(s => s.id === Number(process.env.AUTH_EMAIL_SENDER_ID) && s.active)) throw new Error('Login sender unavailable');
 });
 if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_SHEET_ID) await check('Google Sheets', async () => {
   const auth = new GoogleAuth({ credentials: JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON), scopes: ['https://www.googleapis.com/auth/spreadsheets.readonly'] });
@@ -26,7 +30,7 @@ if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_SHEET_ID) awai
 });
 if (process.env.DATABASE_URL) await check('Neon database and migration', async () => {
   const sql = neon(process.env.DATABASE_URL);
-  const [row] = await sql`SELECT to_regclass('portal_approvals') IS NOT NULL AND to_regclass('portal_locks') IS NOT NULL AND to_regclass('portal_operations') IS NOT NULL AS ready`;
+  const [row] = await sql`SELECT to_regclass('portal_approvals') IS NOT NULL AND to_regclass('portal_locks') IS NOT NULL AND to_regclass('portal_operations') IS NOT NULL AND to_regclass('users') IS NOT NULL AND to_regclass('verification_token') IS NOT NULL AND to_regclass('portal_login_limits') IS NOT NULL AS ready`;
   if (!row.ready) throw new Error('Migration needed');
 });
 console.log('Delivery switch: ' + (process.env.PORTAL_SEND_ENABLED === 'true' ? 'enabled' : 'disabled'));

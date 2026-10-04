@@ -12,7 +12,7 @@ export async function requireUser() {
   }
   const session = await auth();
   const email = session?.user?.email?.toLowerCase();
-  if (!email || !allowedEmails().includes(email)) throw new PortalError(401, "Sign in with an approved Google account.");
+  if (!email || !allowedEmails().includes(email)) throw new PortalError(401, "Sign in with an approved email address.");
   return email;
 }
 export function requireSameOrigin(request: Request) {

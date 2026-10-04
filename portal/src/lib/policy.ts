@@ -6,8 +6,8 @@ export function allowedEmails(value = process.env.PORTAL_ALLOWED_EMAILS ?? "") {
   const emails = value.split(",").map(v => v.trim().toLowerCase()).filter(Boolean);
   return emails.length === 2 && new Set(emails).size === 2 && emails.every(v => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v)) ? emails : [];
 }
-export function allowGoogle(email: unknown, verified: unknown, allow = allowedEmails()) {
-  return verified === true && typeof email === "string" && allow.includes(email.trim().toLowerCase());
+export function allowEmail(email: unknown, allow = allowedEmails()) {
+  return typeof email === "string" && allow.includes(email.trim().toLowerCase());
 }
 export function isDemo(env: Record<string, string | undefined> = process.env) {
   return env.PORTAL_DEMO === "true" && env.NODE_ENV !== "production" && !env.VERCEL && !env.VERCEL_ENV;

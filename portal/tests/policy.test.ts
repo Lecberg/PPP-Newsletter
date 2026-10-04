@@ -1,16 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { allowGoogle, allowedEmails, deliveryPolicy, fingerprint, isDemo, recipient, validateCampaign } from "@/lib/policy";
+import { allowEmail, allowedEmails, deliveryPolicy, fingerprint, isDemo, recipient, validateCampaign } from "@/lib/policy";
 import { parseIssues } from "@/lib/sheets";
 import { DemoBrevo } from "@/lib/demo";
 
 describe("private access", () => {
   const allow = allowedEmails("frankie.wong@todplus.com,u3664746@connect.hku.hk");
-  it("allows exactly the two verified Google addresses", () => {
-    expect(allowGoogle("frankie.wong@todplus.com", true, allow)).toBe(true);
-    expect(allowGoogle("u3664746@connect.hku.hk", true, allow)).toBe(true);
-    expect(allowGoogle("stranger@todplus.com", true, allow)).toBe(false);
-    expect(allowGoogle("frankie.wong@todplus.com", false, allow)).toBe(false);
-    expect(allowGoogle("frankie.wong@todplus.com", "true", allow)).toBe(false);
+  it("allows exactly the two configured email addresses", () => {
+    expect(allowEmail("frankie.wong@todplus.com", allow)).toBe(true);
+    expect(allowEmail(" U3664746@CONNECT.HKU.HK ", allow)).toBe(true);
+    expect(allowEmail("stranger@todplus.com", allow)).toBe(false);
+    expect(allowEmail(null, allow)).toBe(false);
+    expect(allowEmail(true, allow)).toBe(false);
   });
   it("fails closed for missing, duplicate, or excessive allowed accounts", () => {
     for (const value of ["", "a@example.com", "a@example.com,a@example.com", "a@example.com,b@example.com,c@example.com", "a,b"]) expect(allowedEmails(value)).toEqual([]);
