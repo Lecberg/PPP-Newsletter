@@ -157,3 +157,36 @@ Kept the Google server credentials used for Sheets. The old web login credential
 Both real inboxes have delivered preview messages; one person has confirmed the complete preview and production flows.
 The other person's individual inbox confirmation remains an operational follow-up.
 Newsletter sending remains disabled. The controlled newsletter delivery test remains a separate pending task.
+
+## Recipient choices for each issue — 4 October 2026
+
+Added a **Receive this issue** checkbox beside every recipient and a **Choose receivers for** issue selector.
+New issues start with all subscribed contacts included. Unticking a contact affects only that issue.
+Choices save in Neon and remain after a refresh. They do not remove contacts or change subscription choices.
+Unsubscribed contacts cannot be selected. Pending or completed delivery requests lock recipient choices.
+Choice changes and sends share the existing list lock. Version checks reject changes from stale tabs.
+Every choice change requires a fresh delivery review, even when the choice changes back.
+
+Brevo sends campaigns to lists rather than individual contact numbers.
+Delivery preparation creates a private exclusion list owned by one campaign when needed.
+It verifies exact excluded membership and campaign targeting before requesting delivery.
+The original main list stays the destination, preserving its unsubscribe rules.
+Partial preparation, provider timeouts, changed content, and unexpected exclusions abort without requesting a send.
+Approval records retain the selected choices and final delivery settings.
+The new migration only adds `portal_recipient_selections`. It passed against production and preview Neon.
+
+- All 109 ordinary portal tests pass. The 14 opt-in database tests are skipped by default.
+- All 14 real preview database checks passed, including concurrent choice changes and persistent choices.
+- These database checks use fake newsletter providers. They never send email and remove their synthetic records.
+- All 33 existing Python tests pass.
+- Desktop checks at 1536 × 1024 and phone checks at 390 × 844 passed.
+- Browser checks covered including and excluding recipients, refresh persistence, searching, and switching issues.
+- A zero-recipient selection disabled delivery. The final confirmation showed the selected recipient count.
+- Previous sent issues had disabled checkboxes. Unsubscribed contacts stayed disabled throughout.
+- The phone table scrolls inside its own region. The page fits the phone width.
+- No browser warnings, errors, or framework overlays appeared during these checks.
+
+Screenshots are saved outside the repository as `recipient-selection-desktop.png` and `recipient-selection-mobile.png`.
+Browser checks used explicitly marked local demonstration data. They changed no real subscriber choices.
+Actual newsletter delivery with chosen recipients still requires the separate controlled delivery test.
+Sending stays disabled in both cloud environments.

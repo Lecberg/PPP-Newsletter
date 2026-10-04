@@ -6,6 +6,7 @@ import { BrevoError, PortalError } from "./errors";
 
 export const contactInput = z.object({ name: z.string().trim().min(1, "Enter a name.").max(150), email: z.email("Enter a valid email address.").trim().toLowerCase().max(254) }).strict();
 export const sendInput = z.object({ fingerprint: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
+export const selectionInput = z.object({ included: z.boolean(), revision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER) }).strict();
 export function parseId(value: string) {
   const id = Number(value);
   if (!/^\d+$/.test(value) || !Number.isSafeInteger(id) || id < 1) throw new PortalError(400, "Invalid contact or campaign number.");

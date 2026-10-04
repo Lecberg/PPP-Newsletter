@@ -23,10 +23,29 @@ describe.skipIf(process.env.PORTAL_LIVE_DATABASE_TESTS !== "true")("live Neon ap
       sql`DELETE FROM portal_delivery_attempts WHERE campaign_id = ${id}`,
       sql`DELETE FROM portal_approvals WHERE campaign_id = ${id}`,
       sql`DELETE FROM portal_operations WHERE actor IN (${actor}, ${client})`,
-      sql`DELETE FROM portal_locks WHERE scope IN (${scope}, ${`list:${id}`})`
+      sql`DELETE FROM portal_locks WHERE scope IN (${scope}, ${`list:${id}`})`,
+      sql`DELETE FROM portal_recipient_selections WHERE campaign_id = ${id}`
     ]);
   }, 15_000);
   const approval = () => ({ campaignId: id, listId: id, approvedBy: actor, fingerprint: "a".repeat(64), snapshot, outcome: "submitting" as const });
+
+  it("allows one concurrent selection update and shares saved choices across instances", async () => {
+    const results = await Promise.allSettled([store.setSelection(id, id, 1, false, 0), other.setSelection(id, id, 2, false, 0)]);
+    expect(results.filter(r => r.status === "fulfilled")).toHaveLength(1);
+    expect(results.filter(r => r.status === "rejected")).toHaveLength(1);
+    const saved = await other.selection(id, id);
+    expect(saved.revision).toBe(1); expect(saved.excludedIds).toHaveLength(1);
+    await other.setSelection(id, id, saved.excludedIds[0], true, 1);
+    expect(await store.selection(id, id)).toMatchObject({ excludedIds: [], revision: 2 });
+    await expect(store.setSelection(id, id, 2, false, 1)).rejects.toMatchObject({ status: 409 });
+  }, 30_000);
+
+  it("separates newsletter-list scopes and retains exclusion ownership without changing choices", async () => {
+    await store.setSelection(id, id, 1, false, 0); await store.setExclusionList(id, id, 54321);
+    expect(await other.selection(id, id)).toEqual({ excludedIds: [1], revision: 1, exclusionListId: 54321 });
+    expect(await other.selection(id, 999)).toEqual({ excludedIds: [], revision: 0, exclusionListId: null });
+    await expect(store.setExclusionList(id, id, 54322)).rejects.toMatchObject({ status: 409 });
+  }, 30_000);
 
   it("grants one concurrent lock and refuses release by a different token", async () => {
     const results = await Promise.allSettled([store.lock(scope, "one"), other.lock(scope, "two")]);

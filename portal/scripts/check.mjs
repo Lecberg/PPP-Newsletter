@@ -31,7 +31,7 @@ if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_SHEET_ID) awai
 if (process.env.DATABASE_URL) await check('Neon database and migration', async () => {
   const sql = neon(process.env.DATABASE_URL);
   const [row] = await sql`SELECT to_regclass('portal_approvals') IS NOT NULL AND to_regclass('portal_locks') IS NOT NULL AND to_regclass('portal_operations') IS NOT NULL AND to_regclass('users') IS NOT NULL AND to_regclass('verification_token') IS NOT NULL AND to_regclass('portal_login_limits') IS NOT NULL AS ready`;
-  if (!row.ready) throw new Error('Migration needed');
+  if (!row.ready || !(await sql`SELECT to_regclass('portal_recipient_selections') IS NOT NULL AS ready`)[0].ready) throw new Error('Migration needed');
 });
 console.log('Delivery switch: ' + (process.env.PORTAL_SEND_ENABLED === 'true' ? 'enabled' : 'disabled'));
 process.exitCode = failed ? 1 : 0;

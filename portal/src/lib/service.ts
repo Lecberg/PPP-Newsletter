@@ -1,6 +1,6 @@
 import { BrevoError, PortalError } from "./errors";
 import { fingerprint, recipient, validateCampaign } from "./policy";
-import type { Approval, BrevoPort, Contact, IssueDetail, IssueRow, SheetPort, StorePort } from "./types";
+import type { Approval, BrevoPort, Contact, IssueDetail, IssueRecipients, IssueRow, SheetPort, StorePort } from "./types";
 
 export class PortalService {
   constructor(private brevo: BrevoPort, private sheets: SheetPort, private store: StorePort,
@@ -47,8 +47,8 @@ export class PortalService {
   }
   async issue(id: number): Promise<IssueDetail> {
     const row = await this.knownIssue(id), listId = this.listId();
-    const [campaign, contacts, initialApproval] = await Promise.all([
-      this.brevo.campaign(id), this.brevo.contacts(listId), this.store.approval(id)
+    const [campaign, contacts, initialApproval, selection] = await Promise.all([
+      this.brevo.campaign(id), this.brevo.contacts(listId), this.store.approval(id), this.store.selection(id, listId)
     ]);
     let approval = initialApproval;
     // Reconciliation shares the mutation lock, so old reads cannot overwrite newer status.
@@ -68,14 +68,15 @@ export class PortalService {
     }
     const recipients = contacts.map(c => recipient(c, listId));
     let reason = this.delivery.reason;
-    try { validateCampaign(campaign, listId); } catch (error) { reason = (error as Error).message; }
+    try { validateCampaign(campaign, listId, selection.exclusionListId); } catch (error) { reason = (error as Error).message; }
     if (campaign.status !== "draft") reason = "This campaign is no longer an unsent draft.";
     if (approval && approval.outcome !== "rejected") reason = "This campaign already has a delivery request. Refresh to check its status.";
-    if (!recipients.some(r => r.subscribed)) reason = "Add at least one subscribed recipient before sending.";
+    const eligible = recipients.filter(r => r.subscribed && !selection.excludedIds.includes(r.id));
+    if (!eligible.length) reason = "Choose at least one subscribed recipient before sending.";
     return { ...row, subject: campaign.subject, html: campaign.htmlContent,
       status: approval && approval.outcome !== "rejected" ? approval.outcome : campaign.status,
-      eligibleCount: recipients.filter(r => r.subscribed).length, recipientCount: recipients.length,
-      fingerprint: fingerprint({ campaign, recipients, listId }),
+      eligibleCount: eligible.length, recipientCount: recipients.length,
+      fingerprint: fingerprint({ campaign, recipients, listId, selection }),
       canSend: this.delivery.enabled && !reason, sendDisabledReason: reason,
       approval: approval ? { approvedBy: approval.approvedBy, approvedAt: approval.approvedAt, outcome: approval.outcome } : null };
   }
@@ -83,6 +84,31 @@ export class PortalService {
     const q = search.toLowerCase().trim(), listId = this.listId();
     return (await this.brevo.contacts(listId)).map(c => recipient(c, listId))
       .filter(r => !q || r.name.toLowerCase().includes(q) || r.email.toLowerCase().includes(q));
+  }
+  async issueRecipients(id: number): Promise<IssueRecipients> {
+    await this.knownIssue(id);
+    const listId = this.listId();
+    const [campaign, contacts, selection, approval] = await Promise.all([
+      this.brevo.campaign(id), this.brevo.contacts(listId), this.store.selection(id, listId), this.store.approval(id)
+    ]);
+    const excluded = new Set(selection.excludedIds);
+    return { campaignId: id, subject: campaign.subject, revision: selection.revision,
+      canEdit: campaign.status === "draft" && (!approval || approval.outcome === "rejected"),
+      recipients: contacts.map(c => { const person = recipient(c, listId); return { ...person, included: person.subscribed && !excluded.has(person.id) }; }) };
+  }
+  async chooseRecipient(actor: string, id: number, contactId: number, included: boolean, revision: number) {
+    return this.withLock("choose_issue_recipient", async () => {
+      await this.knownIssue(id);
+      const [campaign, approval, contact, selection] = await Promise.all([
+        this.brevo.campaign(id), this.store.approval(id), this.member(contactId), this.store.selection(id, this.listId())
+      ]);
+      if (campaign.status !== "draft" || (approval && approval.outcome !== "rejected")) throw new PortalError(409, "Recipient choices are locked after delivery is requested.");
+      validateCampaign(campaign, this.listId(), selection.exclusionListId);
+      if (included && !recipient(contact, this.listId()).subscribed) throw new PortalError(409, "Unsubscribed recipients cannot be selected.");
+      await this.store.setSelection(id, this.listId(), contactId, included, revision);
+      await this.store.log(actor, "choose_issue_recipient", `${id}:${contactId}`, included ? "included" : "excluded");
+      return { ok: true };
+    });
   }
   private async member(id: number): Promise<Contact> {
     const listId = this.listId();
@@ -126,18 +152,38 @@ export class PortalService {
     return this.withLock("send_campaign", async () => {
       await this.knownIssue(id);
       const listId = this.listId();
-      const [campaign, contacts, existing] = await Promise.all([
-        this.brevo.campaign(id), this.brevo.contacts(listId), this.store.approval(id)
+      const [campaign, contacts, existing, selection] = await Promise.all([
+        this.brevo.campaign(id), this.brevo.contacts(listId), this.store.approval(id), this.store.selection(id, listId)
       ]);
       if (existing && existing.outcome !== "rejected") throw new PortalError(409, "A delivery request already exists. Refresh to check its status.");
       if (campaign.status !== "draft") throw new PortalError(409, "This campaign is no longer an unsent draft.");
-      validateCampaign(campaign, listId);
+      validateCampaign(campaign, listId, selection.exclusionListId);
       const recipients = contacts.map(c => recipient(c, listId));
-      if (!recipients.some(r => r.subscribed)) throw new PortalError(409, "There are no subscribed recipients.");
-      const snapshot = { campaign, recipients, listId }, freshFingerprint = fingerprint(snapshot);
+      if (!recipients.some(r => r.subscribed && !selection.excludedIds.includes(r.id))) throw new PortalError(409, "There are no subscribed recipients selected.");
+      const snapshot = { campaign, recipients, listId, selection: { excludedIds: selection.excludedIds, revision: selection.revision } }, freshFingerprint = fingerprint(snapshot);
       if (freshFingerprint !== reviewedFingerprint) throw new PortalError(409, "The draft or recipients changed. Refresh and review them again before sending.");
+      const excludedIds = recipients.filter(r => selection.excludedIds.includes(r.id)).map(r => r.id);
+      let exclusionListId = selection.exclusionListId;
+      if (excludedIds.length && !exclusionListId) {
+        exclusionListId = await this.brevo.createExclusionList(listId, id);
+        await this.store.setExclusionList(id, listId, exclusionListId);
+      }
+      // Keep the original mailing list so its unsubscribe rules still apply.
+      // This private exclusion list belongs only to this campaign, never future issues.
+      if (exclusionListId) {
+        await this.brevo.setExcludedContacts(exclusionListId, excludedIds);
+        await this.brevo.target(id, listId, excludedIds.length ? exclusionListId : null);
+        const [prepared, freshContacts] = await Promise.all([this.brevo.campaign(id), this.brevo.contacts(listId)]);
+        validateCampaign(prepared, listId, exclusionListId);
+        const targetings = [prepared.recipients?.exclusionListIds, prepared.recipients?.exclusionLists].filter(ids => ids !== undefined);
+        if (!targetings.length || targetings.some(ids => ids.length !== (excludedIds.length ? 1 : 0) || (excludedIds.length && ids[0] !== exclusionListId))) throw new PortalError(409, "Brevo did not confirm the selected recipients. No send was requested.");
+        if (fingerprint({ ...snapshot, campaign: { ...prepared, recipients: campaign.recipients }, recipients: freshContacts.map(c => recipient(c, listId)) }) !== reviewedFingerprint) {
+          throw new PortalError(409, "The draft or recipients changed during preparation. Refresh and review again.");
+        }
+      }
       // This durable record is committed BEFORE any external send request.
-      await this.store.begin({ campaignId: id, listId, approvedBy: actor, fingerprint: freshFingerprint, snapshot, outcome: "submitting" });
+      await this.store.begin({ campaignId: id, listId, approvedBy: actor, fingerprint: freshFingerprint,
+        snapshot: { ...snapshot, deliveryTarget: { exclusionListId: excludedIds.length ? exclusionListId : null } }, outcome: "submitting" });
       try { await this.brevo.send(id); }
       catch (error) {
         const definite = error instanceof BrevoError && error.definite;

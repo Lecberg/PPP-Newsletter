@@ -98,11 +98,20 @@ Never copy live subscriber addresses into the test list.
 
 1. Enter an approved email address and select **Send login link**. Check your inbox and spam folder.
 2. Open the email link and select **Continue to portal**. Opening the page alone does not use the link.
-3. Open **Recipients** to add, correct, or remove people.
-4. Open **Newsletter** and read the draft. **Previous issues** opens issue history.
-5. Click **Confirm delivery**. Check the subject and recipient count in the final dialog.
-6. Click **Confirm and send**. **Submitted for sending** means Brevo accepted the request.
-7. Use **Refresh status** to check whether Brevo has marked it **Sent**.
+3. Open **Newsletter** and read the draft. **Previous issues** opens issue history.
+4. Click **Choose recipients**, or open **Recipients** and use **Choose receivers for**.
+5. Tick **Receive this issue** beside each person who should receive that newsletter. Choices save immediately.
+6. Return to **Newsletter**. Click **Confirm delivery** and check the subject and selected recipient count.
+7. Click **Confirm and send**. **Submitted for sending** means Brevo accepted the request.
+8. Use **Refresh status** to check whether Brevo has marked it **Sent**.
+
+Recipient choices apply only to the chosen newsletter. Each new issue starts with all subscribed recipients selected.
+Unticking someone keeps their contact and subscription intact. Unsubscribed people cannot be selected.
+You can still add, correct, or remove contacts from **Recipients**.
+Choices survive a refresh and are shared between the two approved users.
+A choice changed in another tab requires a refresh before another change or delivery.
+Delivery needs at least one subscribed recipient selected. Choices lock after a delivery request.
+Newsletter sending remains disabled until the separate controlled delivery test passes.
 
 Wait 60 seconds before requesting another link. Each address can request five links per hour.
 Each network address can request 20 links per hour. Limits apply across tabs and server instances.
@@ -128,8 +137,17 @@ These records contain private contact details. Restrict database access to the s
 The portal updates matching `approval_status` cells in Sheets without changing existing columns.
 If Sheets is unavailable, the approval stays in Neon. A later status refresh retries the Sheet update.
 
-A shared database lock prevents overlapping sends and recipient changes.
+A shared database lock prevents overlapping sends, recipient choices, and contact changes.
 Locks do not expire automatically. A stopped server request must never silently grant a second send attempt.
+
+Neon stores each issue's excluded contact numbers and choice version separately from subscriptions.
+Changing choices requires a fresh delivery review, including when a choice is changed back.
+When preparing delivery, the portal creates a private Brevo exclusion list for that campaign if needed.
+It keeps the main newsletter list as the destination, preserving its unsubscribe rules.
+The portal verifies both the exclusion list and campaign settings before requesting delivery.
+Preparation failure does not request a send. Saved approval records include the reviewed choices and delivery settings.
+Do not edit or delete lists named `PPP portal exclusions ...` while their campaign is pending or sending.
+These lists belong to individual campaigns. They are never reused for future newsletters.
 
 If the site reports **Outcome unknown**, do not repeat delivery.
 Refresh its status. Brevo-confirmed sending or sent status resolves the record.
@@ -165,7 +183,7 @@ Automated checks cover access rules, deployment isolation, stale reviews, shared
 duplicate sends, unknown outcomes, recipient ownership, and unsubscribe protection.
 `docs/verification.md` records browser checks and remaining external setup.
 
-Twelve additional checks run against the isolated preview database when explicitly enabled.
+Fourteen additional checks run against the isolated preview database when explicitly enabled.
 They use fake newsletter providers and never send email.
 
 ```powershell

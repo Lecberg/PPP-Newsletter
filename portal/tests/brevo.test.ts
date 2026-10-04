@@ -48,4 +48,31 @@ describe("Brevo HTTP integration", () => {
     await expect(client.send(12)).rejects.toMatchObject({ definite: false });
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
+  it("updates only campaign targeting, preserving the original list", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
+    await client.target(13, 5, 10);
+    expect(fetchMock.mock.calls[0][0]).toMatch(/emailCampaigns\/13$/);
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ recipients: { listIds: [5], exclusionListIds: [10] } });
+  });
+  it("uses existing contacts only and checks exclusion membership after updates", async () => {
+    fetchMock.mockResolvedValueOnce(json({ contacts: [{ id: 7 }, { id: 8 }] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(json({ contacts: [{ id: 7 }, { id: 9 }] }));
+    await client.setExcludedContacts(10, [7, 9]);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toEqual({ ids: [8] });
+    expect(JSON.parse(fetchMock.mock.calls[2][1].body)).toEqual({ ids: [9] });
+    expect(fetchMock.mock.calls.every(([url]) => url.includes('/contacts/lists/10/'))).toBe(true);
+  });
+  it("refuses partial exclusion updates instead of sending to unchecked recipients", async () => {
+    fetchMock.mockResolvedValueOnce(json({ contacts: [] }))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }))
+      .mockResolvedValueOnce(json({ contacts: [] }));
+    await expect(client.setExcludedContacts(10, [7])).rejects.toThrow("not confirmed");
+  });
+  it("creates a private campaign exclusion list in the configured list's folder", async () => {
+    fetchMock.mockResolvedValueOnce(json({ folderId: 2 })).mockResolvedValueOnce(json({ id: 10 }, 201));
+    expect(await client.createExclusionList(5, 13)).toBe(10);
+    expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({ folderId: 2, name: expect.stringContaining('PPP portal exclusions 5-13-') });
+  });
 });

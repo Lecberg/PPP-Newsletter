@@ -1,4 +1,5 @@
 import "server-only";
+import { randomUUID } from "node:crypto";
 import { required } from "./config";
 import { BrevoError, PortalError } from "./errors";
 import type { BrevoPort, Campaign, Contact } from "./types";
@@ -56,6 +57,28 @@ export class BrevoClient implements BrevoPort {
   }
   async remove(listId: number, id: number) {
     await this.request(`/contacts/lists/${listId}/contacts/remove`, "POST", { ids: [id] });
+  }
+  async createExclusionList(listId: number, campaignId: number) {
+    const parent = await this.request<{ folderId: number }>(`/contacts/lists/${listId}`);
+    const list = await this.request<{ id: number }>("/contacts/lists", "POST", {
+      name: `PPP portal exclusions ${listId}-${campaignId}-${randomUUID()}`, folderId: parent.folderId
+    });
+    if (!Number.isSafeInteger(list.id) || list.id < 1 || list.id === listId) throw new PortalError(503, "Brevo did not confirm the exclusion list.");
+    return list.id;
+  }
+  async setExcludedContacts(listId: number, ids: number[]) {
+    const current = (await this.contacts(listId)).map(c => c.id), wanted = new Set(ids), existing = new Set(current);
+    const remove = current.filter(id => !wanted.has(id)), add = ids.filter(id => !existing.has(id));
+    for (const [operation, contacts] of [["remove", remove], ["add", add]] as const) {
+      for (let offset = 0; offset < contacts.length; offset += 150) {
+        await this.request(`/contacts/lists/${listId}/contacts/${operation}`, "POST", { ids: contacts.slice(offset, offset + 150) });
+      }
+    }
+    const actual = (await this.contacts(listId)).map(c => c.id);
+    if (actual.length !== wanted.size || actual.some(id => !wanted.has(id))) throw new PortalError(409, "Brevo has not confirmed the recipient choices. Refresh before sending.");
+  }
+  async target(id: number, listId: number, exclusionListId: number | null) {
+    await this.request(`/emailCampaigns/${id}`, "PUT", { recipients: { listIds: [listId], exclusionListIds: exclusionListId ? [exclusionListId] : [] } });
   }
   async send(id: number) { await this.request(`/emailCampaigns/${id}/sendNow`, "POST"); }
 }

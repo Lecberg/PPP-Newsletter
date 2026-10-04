@@ -3,10 +3,37 @@ import { neon } from "@neondatabase/serverless";
 import { randomUUID } from "node:crypto";
 import { required } from "./config";
 import { PortalError } from "./errors";
-import type { Approval, ApprovalOutcome, StorePort } from "./types";
+import type { Approval, ApprovalOutcome, RecipientSelection, StorePort } from "./types";
 
 export class NeonStore implements StorePort {
   private sql() { return neon(required("DATABASE_URL")); }
+  async selection(id: number, listId: number): Promise<RecipientSelection> {
+    const sql = this.sql(), rows = await sql`SELECT excluded_ids, revision, exclusion_list_id FROM portal_recipient_selections WHERE campaign_id = ${id} AND list_id = ${listId}`;
+    const row = rows[0];
+    return row ? { excludedIds: row.excluded_ids.map(Number), revision: Number(row.revision), exclusionListId: row.exclusion_list_id === null ? null : Number(row.exclusion_list_id) }
+      : { excludedIds: [], revision: 0, exclusionListId: null };
+  }
+  async setSelection(id: number, listId: number, contactId: number, included: boolean, revision: number) {
+    const sql = this.sql();
+    const rows = await sql`INSERT INTO portal_recipient_selections (campaign_id, list_id, excluded_ids, revision)
+      SELECT ${id}, ${listId}, ${included ? [] : [contactId]}::bigint[], 1
+      WHERE ${revision} = 0 OR EXISTS (SELECT 1 FROM portal_recipient_selections
+        WHERE campaign_id = ${id} AND list_id = ${listId} AND revision = ${revision})
+      ON CONFLICT (campaign_id, list_id) DO UPDATE SET excluded_ids =
+        CASE WHEN ${included} THEN array_remove(portal_recipient_selections.excluded_ids, ${contactId}::bigint)
+        ELSE ARRAY(SELECT DISTINCT x FROM unnest(portal_recipient_selections.excluded_ids || ARRAY[${contactId}::bigint]) x) END,
+        revision = portal_recipient_selections.revision + 1, updated_at = now()
+      WHERE portal_recipient_selections.revision = ${revision} RETURNING campaign_id`;
+    if (!rows.length) throw new PortalError(409, "Recipient choices changed in another tab. Refresh and choose again.");
+  }
+  async setExclusionList(id: number, listId: number, exclusionListId: number) {
+    const sql = this.sql();
+    const rows = await sql`INSERT INTO portal_recipient_selections (campaign_id, list_id, exclusion_list_id)
+      VALUES (${id}, ${listId}, ${exclusionListId}) ON CONFLICT (campaign_id, list_id) DO UPDATE
+      SET exclusion_list_id = EXCLUDED.exclusion_list_id WHERE portal_recipient_selections.exclusion_list_id IS NULL
+        OR portal_recipient_selections.exclusion_list_id = EXCLUDED.exclusion_list_id RETURNING campaign_id`;
+    if (!rows.length) throw new PortalError(409, "The campaign's delivery settings changed. Refresh before sending.");
+  }
   async lock(scope: string, operation: string) {
     const token = randomUUID(), sql = this.sql();
     const rows = await sql`INSERT INTO portal_locks (scope, token, operation) VALUES (${scope}, ${token}, ${operation}) ON CONFLICT DO NOTHING RETURNING token`;

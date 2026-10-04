@@ -28,13 +28,14 @@ export function recipient(contact: Contact, listId: number): Recipient {
   return { id: contact.id, email: contact.email ?? "", name,
     subscribed: Boolean(contact.email) && contact.emailBlacklisted !== true && !(contact.listUnsubscribed ?? []).includes(listId) };
 }
-export function validateCampaign(campaign: Campaign, listId: number) {
+export function validateCampaign(campaign: Campaign, listId: number, exclusionListId: number | null = null) {
   const r = campaign.recipients;
   // Brevo writes listIds but its campaign report returns lists/exclusionLists/segments.
   const lists = r?.listIds ?? r?.lists;
   if (!r || !Array.isArray(lists) || lists.length !== 1 || lists[0] !== listId
     || (r.lists !== undefined && (r.lists.length !== 1 || r.lists[0] !== listId))
-    || [r.exclusionListIds, r.exclusionLists, r.segmentIds, r.segments, r.excludedSegments].some(ids => ids !== undefined && (!Array.isArray(ids) || ids.length > 0))
+    || [r.exclusionListIds, r.exclusionLists].some(ids => ids !== undefined && (!Array.isArray(ids) || (ids.length > 0 && (ids.length !== 1 || ids[0] !== exclusionListId))))
+    || [r.segmentIds, r.segments, r.excludedSegments].some(ids => ids !== undefined && (!Array.isArray(ids) || ids.length > 0))
     || Object.keys(r).some(k => !["listIds", "lists", "exclusionListIds", "exclusionLists", "segmentIds", "segments", "excludedSegments"].includes(k))) {
     throw new PortalError(409, "This campaign does not target only the configured newsletter list.");
   }
@@ -46,7 +47,8 @@ export function fingerprint(snapshot: ReviewSnapshot) {
   return createHash("sha256").update(JSON.stringify({
     id: c.id, subject: c.subject, html: c.htmlContent, status: c.status,
     sender: c.sender, targeting: c.recipients, scheduledAt: c.scheduledAt, type: c.type, abTesting: c.abTesting,
-    listId: snapshot.listId, recipients: [...snapshot.recipients].sort((a, b) => a.id - b.id)
+    listId: snapshot.listId, recipients: [...snapshot.recipients].sort((a, b) => a.id - b.id),
+    selection: snapshot.selection ? { excludedIds: [...snapshot.selection.excludedIds].sort((a, b) => a - b), revision: snapshot.selection.revision } : undefined
   })).digest("hex");
 }
 export const statusLabel = (status: string) => ({
