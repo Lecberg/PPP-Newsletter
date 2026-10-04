@@ -45,7 +45,10 @@ This permits Vercel's changing outgoing addresses. The secret Brevo key remains 
 Both deployments successfully submitted login emails for the two approved addresses.
 Production and preview have separate Neon databases and login secrets.
 Login links work once and expire in ten minutes. Each login lasts up to eight hours.
-Old Google login sessions are rejected. Sending remains disabled until controlled delivery checks pass.
+Old Google login sessions are rejected.
+The owner waived the controlled newsletter delivery tests on 4 October 2026 and requested production sending.
+Production sending is enabled. Preview sending stays disabled.
+Actual newsletter delivery to the controlled inboxes has not been verified.
 See `docs/verification.md` for completed checks and remaining setup.
 
 The implementation is on `codex/newsletter-portal`, with draft pull request #3.
@@ -60,16 +63,16 @@ The main branch remains unchanged. Deploy this branch manually until it is merge
 7. Set `AUTH_EMAIL_SENDER_ID` to the existing active Brevo sender, currently `1`. No new mail password is needed.
 8. Set `AUTH_URL` to the stable site address. Emails always link to this address.
 9. Run `pnpm db:migrate` against each Neon database. The migrations only add tables and indexes.
-10. Keep `PORTAL_SEND_ENABLED=false` until login and test delivery have been verified.
+10. Keep `PORTAL_SEND_ENABLED=false` for fresh installations until release is approved. Keep previews disabled outside controlled tests.
 11. Deploy, check the build, and verify that other email addresses cannot enter or call protected server routes.
-12. After the controlled delivery test passes, enable production delivery and redeploy.
+12. Enable production delivery with `PORTAL_SEND_ENABLED=true` and redeploy when the owner authorizes release.
 
 For command-line deployment, run from the repository root because the project root is `portal/`:
 
 ```powershell
 vercel link --yes --scope ryan-mas-projects-71fa00c3 --project ppp-newsletter-portal
 vercel deploy --target preview --yes --scope ryan-mas-projects-71fa00c3
-# After preview login and database checks pass; keep newsletter sending disabled:
+# Rebuild production with its own credentials and approved sending setting:
 vercel deploy --prod --yes --scope ryan-mas-projects-71fa00c3
 ```
 
@@ -111,7 +114,7 @@ You can still add, correct, or remove contacts from **Recipients**.
 Choices survive a refresh and are shared between the two approved users.
 A choice changed in another tab requires a refresh before another change or delivery.
 Delivery needs at least one subscribed recipient selected. Choices lock after a delivery request.
-Newsletter sending remains disabled until the separate controlled delivery test passes.
+Production sending is enabled at the owner's request. Every newsletter still requires final confirmation.
 
 Wait 60 seconds before requesting another link. Each address can request five links per hour.
 Each network address can request 20 links per hour. Limits apply across tabs and server instances.

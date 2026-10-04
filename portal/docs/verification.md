@@ -237,3 +237,25 @@ Refreshing `/login` alone retains its login form; the new email-link tab is the 
 The signed-in preview displayed the new request-limit message. The summary endpoint reported a reset at 16:00 Hong Kong time.
 Campaign detail requests previously reported a reset around 16:03. Recheck after 16:05 before resuming.
 Screenshot: `controlled-delivery-limit.png`, saved outside the repository.
+
+## Production sending enabled at the owner's request — 4 October 2026
+
+The owner explicitly asked to skip the controlled newsletter delivery tests and prepare the portal for use.
+This replaces the earlier requirement to keep production sending disabled until those tests pass.
+Actual delivery to the two controlled inboxes remains unverified; the tests were waived, not passed.
+No newsletter was sent during this release. Test contacts remain outside the production list.
+
+Updated only production's `PORTAL_SEND_ENABLED` to `true` and rebuilt production with its existing credentials.
+Fresh environment downloads confirm production sending enabled and preview sending disabled.
+The preview still uses its separate database, login secret, test Sheet, and mailing list.
+Production deployment `dpl_5z2J4XYGjXgk8CtMnWtcKcjqqVvF` is READY at the existing production address.
+The cloud build and TypeScript checks passed. No application code or database schema changed in this release.
+
+The existing approved user's Edge session opened the live draft successfully after deployment.
+The draft remains awaiting approval, with one selected eligible recipient and an enabled **Confirm delivery** button.
+The final confirmation displayed the subject and selected count; cancelled without clicking **Confirm and send**.
+The live Recipients page loaded the configured production list and its per-issue receiver checkbox.
+No recipient details or choices were changed. Screenshot: `portal-ready-production.png`, saved outside the repository.
+All nine protected-route checks returned HTTP 401 with private, no-store headers without portal login.
+Per-issue choices, unsubscribe protection, shared locks, fresh review checks, and uncertain-send protection remain active.
+The operating guide now reflects enabled production sending and the owner's waiver.
