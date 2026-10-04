@@ -16,11 +16,11 @@ describe("review and delivery workflow", () => {
     ]);
   });
   it("ignores deleted Brevo campaigns and returns an empty history when none remain", async () => {
-    vi.spyOn(brevo, "campaign").mockRejectedValue(new BrevoError(404, true, "Campaign missing"));
+    vi.spyOn(brevo, "campaignSummaries").mockResolvedValue([]);
     expect(await service.issues()).toEqual([]);
   });
   it("reports provider outages instead of presenting them as an empty history", async () => {
-    vi.spyOn(brevo, "campaign").mockRejectedValue(new BrevoError(500, false, "Unavailable"));
+    vi.spyOn(brevo, "campaignSummaries").mockRejectedValue(new BrevoError(500, false, "Unavailable"));
     await expect(service.issues()).rejects.toThrow("Unavailable");
   });
   it("shows draft eligibility and does not send on reads", async () => {

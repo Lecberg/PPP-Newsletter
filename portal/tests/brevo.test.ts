@@ -75,4 +75,25 @@ describe("Brevo HTTP integration", () => {
     expect(await client.createExclusionList(5, 13)).toBe(10);
     expect(JSON.parse(fetchMock.mock.calls[1][1].body)).toMatchObject({ folderId: 2, name: expect.stringContaining('PPP portal exclusions 5-13-') });
   });
+  it("loads only requested issue summaries in one request without downloading email content", async () => {
+    fetchMock.mockResolvedValue(json({ campaigns: [{ id: 12, subject: "Project", status: "draft" }, { id: 13, subject: "Other project", status: "sent" }], count: 2 }));
+    expect(await client.campaignSummaries([12])).toEqual([{ id: 12, subject: "Project", status: "draft" }]);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    expect(fetchMock.mock.calls[0][0]).toContain("excludeHtmlContent=true");
+  });
+  it("pages history and omits deleted campaigns without per-campaign requests", async () => {
+    fetchMock.mockResolvedValueOnce(json({ campaigns: Array.from({ length: 100 }, (_, i) => ({ id: i + 1000, subject: "Other", status: "draft" })), count: 101 }))
+      .mockResolvedValueOnce(json({ campaigns: [{ id: 12, subject: "Older", status: "sent" }], count: 101 }));
+    expect(await client.campaignSummaries([12, 13])).toEqual([{ id: 12, subject: "Older", status: "sent" }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock.mock.calls[1][0]).toContain("offset=100");
+  });
+  it("makes no provider request for an empty history", async () => {
+    expect(await client.campaignSummaries([])).toEqual([]); expect(fetchMock).not.toHaveBeenCalled();
+  });
+  it("reports rate-limit reset time without retrying the provider request", async () => {
+    fetchMock.mockResolvedValue(new Response(null, { status: 429, headers: { "x-sib-ratelimit-reset": "2900" } }));
+    await expect(client.campaign(12)).rejects.toThrow(/after \d{2}:\d{2} Hong Kong time/);
+    expect(fetchMock).toHaveBeenCalledOnce();
+  });
 });

@@ -145,6 +145,8 @@ Changing choices requires a fresh delivery review, including when a choice is ch
 When preparing delivery, the portal creates a private Brevo exclusion list for that campaign if needed.
 It keeps the main newsletter list as the destination, preserving its unsubscribe rules.
 The portal verifies both the exclusion list and campaign settings before requesting delivery.
+If every recipient is selected again after preparation, the portal keeps its owned exclusion list empty.
+Brevo rejects an empty exclusion setting. An empty owned list avoids that setting while excluding nobody.
 Preparation failure does not request a send. Saved approval records include the reviewed choices and delivery settings.
 Do not edit or delete lists named `PPP portal exclusions ...` while their campaign is pending or sending.
 These lists belong to individual campaigns. They are never reused for future newsletters.
@@ -168,6 +170,9 @@ Do not reset an uncertain approval based only on Brevo still showing draft.
 If Brevo confirms no sending occurred, record that evidence privately before changing the outcome to `rejected`.
 
 Monitor Vercel runtime errors and unresolved approval states after deployment.
+If Brevo reaches its request limit, the portal shows the supplied reset time in Hong Kong time.
+Wait until that time before refreshing. Delivery requests are never repeated automatically.
+Issue history loads in batches. Recipient choices refresh only the chosen issue, reducing provider requests.
 To stop sending, set `PORTAL_SEND_ENABLED=false` and redeploy.
 Restore the previous Vercel deployment to roll back code. Keep the additive database tables.
 

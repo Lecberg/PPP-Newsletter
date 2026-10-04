@@ -7,20 +7,10 @@ export class PortalService {
     private delivery: { listId: number; enabled: boolean; reason: string | null }) {}
 
   async issues() {
-    const rows = await this.sheets.issues(), found: IssueRow[] = [];
-    // Limit provider requests while replacing Sheet labels with actual campaign data.
-    for (let start = 0; start < rows.length; start += 4) {
-      const batch = await Promise.all(rows.slice(start, start + 4).map(async row => {
-        try {
-          const campaign = await this.brevo.campaign(row.campaignId);
-          return { ...row, subject: campaign.subject, status: campaign.status };
-        } catch (error) {
-          if (error instanceof BrevoError && error.status === 404) return null;
-          throw error;
-        }
-      }));
-      found.push(...batch.filter((row): row is IssueRow & { status: string } => row !== null));
-    }
+    const rows = await this.sheets.issues();
+    // One paged request replaces a separate Brevo request for every historical issue.
+    const summaries = new Map((await this.brevo.campaignSummaries(rows.map(row => row.campaignId))).map(c => [c.id, c]));
+    const found = rows.flatMap(row => { const campaign = summaries.get(row.campaignId); return campaign ? [{ ...row, subject: campaign.subject, status: campaign.status }] : []; });
     // Sheet order is newest first. Keep that order within drafts and history.
     return [...found.filter(row => row.status === "draft"), ...found.filter(row => row.status !== "draft")];
   }

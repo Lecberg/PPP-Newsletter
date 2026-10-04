@@ -200,3 +200,26 @@ The live production browser opened the existing email login screen correctly aft
 GitHub's Newsletter Portal Checks passed for the implementation commit.
 Authenticated checkbox behavior was checked locally. It has not yet been checked in a real user's cloud session.
 No real newsletter, subscription, or recipient choice changed during this release.
+
+## Controlled delivery preparation — 4 October 2026
+
+The owner provided two controlled test inboxes and authorized test newsletters to them.
+Both addresses were new Brevo contacts. Added them only to the isolated preview test list, ID 9.
+The production list, ID 5, was not changed.
+The owner signed in to the stable preview in Edge as an approved account.
+The email link completed login in its new tab. The original login tab did not navigate automatically.
+
+No controlled newsletter was sent during preparation.
+Brevo rejected campaign updates containing `exclusionListIds: []` with HTTP 400, `missing_parameter`.
+Changed delivery preparation to retain the campaign's owned exclusion list even when it has no members.
+Added a regression check for selecting everyone again after uncertain preparation.
+Then Brevo returned HTTP 429 for campaign requests. Its headers reported a 100-request window,
+zero remaining requests, and roughly 49 minutes until reset, around 16:03 Hong Kong time.
+Do not treat the delivery test as passed or enable production sending until actual delivery is verified.
+
+Reduced issue-history reads to one paged Brevo summary request instead of one request per historical issue.
+Recipient choice updates and issue switching reuse the loaded history while checking fresh issue data.
+Sending still rechecks fresh content, targeting, recipients, and approvals under the shared lock.
+Rate-limit errors now show the provider's reset time and do not repeat requests.
+All 114 ordinary portal tests and the local production build passed after these changes.
+The 14 opt-in database checks and 33 Python checks passed earlier; these changes do not alter their tables or Python code.

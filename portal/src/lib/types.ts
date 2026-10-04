@@ -21,6 +21,7 @@ export type IssueDetail = IssueRow & {
   approval: { approvedBy: string; approvedAt: string; outcome: ApprovalOutcome } | null;
 };
 export interface BrevoPort {
+  campaignSummaries(ids: number[]): Promise<Pick<Campaign, "id" | "subject" | "status">[]>;
   campaign(id: number): Promise<Campaign>;
   contacts(listId: number): Promise<Contact[]>;
   contact(id: number | string): Promise<Contact | null>;

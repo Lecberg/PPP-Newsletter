@@ -41,15 +41,15 @@ function Newsletter({ manageRecipients, demo, campaignId, onCampaignChange }: { 
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [message, setMessage] = useState("");
   const [confirm, setConfirm] = useState(false), [busy, setBusy] = useState(false);
   const loadSequence = useRef(0);
-  async function load(id?: number) {
+  async function load(id?: number, refreshHistory = false) {
     const sequence = ++loadSequence.current;
     setLoading(true); setError("");
     try {
-      const rows = await request<IssueRow[]>("/api/issues");
+      const rows = refreshHistory || !issues.length ? await request<IssueRow[]>("/api/issues") : issues;
       const chosen = id ?? rows[0]?.campaignId;
       const detail = chosen ? await request<IssueDetail>(`/api/issues/${chosen}`) : null;
       if (loadSequence.current !== sequence) return;
-      setIssues(rows); setActiveId(chosen ?? null); setIssue(detail); onCampaignChange(chosen ?? null);
+      setIssues(rows.map(row => row.campaignId === detail?.campaignId ? { ...row, status: detail.status } : row)); setActiveId(chosen ?? null); setIssue(detail); onCampaignChange(chosen ?? null);
     } catch (e) { if (loadSequence.current === sequence) { setError((e as Error).message); setIssue(null); } }
     finally { if (loadSequence.current === sequence) setLoading(false); }
   }
@@ -65,7 +65,7 @@ function Newsletter({ manageRecipients, demo, campaignId, onCampaignChange }: { 
     finally { setBusy(false); }
   }
   return <>
-    <div className="page-heading"><div><h1>Review newsletter</h1><p>Read the draft, check recipients, then confirm delivery.</p></div><button className="text-button refresh" onClick={() => load(activeId ?? undefined)} disabled={loading || busy}>Refresh status</button></div>
+    <div className="page-heading"><div><h1>Review newsletter</h1><p>Read the draft, check recipients, then confirm delivery.</p></div><button className="text-button refresh" onClick={() => load(activeId ?? undefined, true)} disabled={loading || busy}>Refresh status</button></div>
     {error && <Notice message={error} error />}{message && <Notice message={message} />}
     {loading && <div className="loading" role="status">Loading newsletter…</div>}
     {!loading && !issue && !error && <div className="empty-state"><h2>Your next issue will appear here.</h2><p>Once the newsletter process creates a Brevo draft, you can review it and confirm delivery.</p></div>}
@@ -96,11 +96,11 @@ function Recipients({ campaignId, onCampaignChange }: { campaignId: number | nul
   const [issues, setIssues] = useState<IssueRow[]>([]), [choices, setChoices] = useState<IssueRecipients | null>(null);
   const loadSequence = useRef(0);
   function choose(person: Recipient | null) { setSelected(person); setAdding(false); setName(person?.name ?? ""); setEmail(person?.email ?? ""); }
-  async function load(initial = false) {
+  async function load(initial = false, refreshHistory = false) {
     const sequence = ++loadSequence.current;
     setLoading(true);
     try {
-      const history = await request<IssueRow[]>("/api/issues");
+      const history = refreshHistory || !issues.length ? await request<IssueRow[]>("/api/issues") : issues;
       const id = campaignId ?? history[0]?.campaignId ?? null;
       const selection = id ? await request<IssueRecipients>(`/api/issues/${id}/recipients`) : null;
       const rows = selection?.recipients ?? await request<Recipient[]>("/api/recipients");
@@ -141,7 +141,7 @@ function Recipients({ campaignId, onCampaignChange }: { campaignId: number | nul
   const includedById = new Map(choices?.recipients.map(person => [person.id, person.included]));
   const receiverCount = choices?.recipients.filter(person => person.included).length ?? 0;
   return <>
-    <div className="page-heading recipients-heading"><div><h1>Recipients</h1><p>Manage who receives this newsletter.</p></div><button className="text-button refresh" disabled={loading || busy} onClick={() => { setError(""); void load(); }}>Refresh list</button></div>
+    <div className="page-heading recipients-heading"><div><h1>Recipients</h1><p>Manage who receives this newsletter.</p></div><button className="text-button refresh" disabled={loading || busy} onClick={() => { setError(""); void load(false, true); }}>Refresh list</button></div>
     {error && <Notice message={error} error />}{message && <Notice message={message} />}
     <section className="issue-recipient-choices" aria-label="Recipient choices for this newsletter">
       <label htmlFor="recipient-issue">Choose receivers for</label>

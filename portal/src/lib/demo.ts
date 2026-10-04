@@ -50,6 +50,7 @@ export class DemoBrevo implements BrevoPort {
     { id: 100, subject: "Hong Kong PPP Weekly — 26 September 2026", htmlContent: demoHtml.replace("3 October 2026", "26 September 2026").replace("2026年10月3日", "2026年9月26日"), status: "sent", recipients: { listIds: [999] }, type: "classic" }];
   people: Contact[] = [{ id: 1, email: "alex@example.com", attributes: { NEWSLETTER_NAME: "Alex Chan" }, listIds: [999] }, { id: 2, email: "grace@example.com", attributes: { NEWSLETTER_NAME: "Grace Wong" }, listIds: [999] }, { id: 3, email: "sam@example.com", attributes: { NEWSLETTER_NAME: "Sam Lee" }, emailBlacklisted: true, listIds: [999] }];
   async campaign(id: number) { const c = this.campaigns.find(c => c.id === id); if (!c) throw new PortalError(404, "Campaign not found."); return structuredClone(c); }
+  async campaignSummaries(ids: number[]) { return this.campaigns.filter(c => ids.includes(c.id)).map(c => ({ id: c.id, subject: c.subject, status: c.status })); }
   async contacts(listId: number) { return structuredClone(this.people.filter(c => c.listIds?.includes(listId))); }
   async contact(id: number | string) { return structuredClone(this.people.find(c => c.id === id || c.email === id) ?? null); }
   async add(listId: number, name: string, email: string) { this.people.push({ id: Math.max(0, ...this.people.map(c => c.id)) + 1, email, attributes: { NEWSLETTER_NAME: name }, listIds: [listId] }); }

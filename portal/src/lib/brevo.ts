@@ -18,6 +18,12 @@ export class BrevoClient implements BrevoPort {
       throw new BrevoError(0, false, "Brevo did not confirm the request. Check its status before trying again.");
     }
     if (!response.ok) {
+      if (response.status === 429) {
+        const reset = Number(response.headers.get("x-sib-ratelimit-reset"));
+        const until = Number.isFinite(reset) && reset > 0 && reset <= 86400
+          ? new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Hong_Kong", hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date(Date.now() + reset * 1000)) : null;
+        throw new BrevoError(429, true, until ? `Brevo's request limit has been reached. Try again after ${until} Hong Kong time.` : "Brevo's request limit has been reached. Wait before trying again.");
+      }
       if (response.status === 404) throw new BrevoError(404, true, "This contact or campaign could not be found.");
       if (response.status === 400) throw new BrevoError(400, true, "Brevo rejected these details. Check for a duplicate email or invalid campaign settings.");
       if (response.status === 402) throw new BrevoError(402, true, "Brevo needs sufficient sending credits before delivery.");
@@ -29,6 +35,20 @@ export class BrevoClient implements BrevoPort {
     return (text ? JSON.parse(text) : undefined) as T;
   }
   campaign(id: number) { return this.request<Campaign>(`/emailCampaigns/${id}`); }
+  async campaignSummaries(ids: number[]) {
+    const pending = new Set(ids), found: Pick<Campaign, "id" | "subject" | "status">[] = [];
+    for (let offset = 0; pending.size; offset += 100) {
+      const page = await this.request<{ campaigns: Pick<Campaign, "id" | "subject" | "status">[]; count?: number }>(`/emailCampaigns?limit=100&offset=${offset}&sort=desc&excludeHtmlContent=true`);
+      if (!Array.isArray(page.campaigns)) throw new PortalError(503, "Brevo did not return the issue history.");
+      for (const campaign of page.campaigns) if (pending.has(campaign.id)) {
+        if (typeof campaign.subject !== "string" || typeof campaign.status !== "string") throw new PortalError(503, "Brevo did not return the issue details.");
+        found.push({ id: campaign.id, subject: campaign.subject, status: campaign.status }); pending.delete(campaign.id);
+      }
+      if (page.campaigns.length < 100 || (page.count !== undefined && offset + page.campaigns.length >= page.count)) break;
+      if (pending.size && offset >= 4900) throw new PortalError(503, "The campaign history is too large to load. Contact the site owner.");
+    }
+    return found;
+  }
   async contacts(listId: number) {
     const contacts: Contact[] = [];
     for (let offset = 0; ; offset += 500) {
