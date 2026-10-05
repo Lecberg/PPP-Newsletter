@@ -51,8 +51,8 @@ Production sending is enabled. Preview sending stays disabled.
 Actual newsletter delivery to the controlled inboxes has not been verified.
 See `docs/verification.md` for completed checks and remaining setup.
 
-The implementation is on `codex/newsletter-portal`, with draft pull request #3.
-The main branch remains unchanged. Deploy this branch manually until it is merged.
+The implementation was released to `main` through pull request #3 on 5 October 2026.
+Deploy from the released main revision. The local working branch remains `codex/newsletter-portal`.
 
 1. Sign in to Vercel. Recommended command-line setup: `npm i -g vercel`.
 2. Use the existing `ppp-newsletter-portal` project. Its root directory is `portal`.
@@ -66,6 +66,7 @@ The main branch remains unchanged. Deploy this branch manually until it is merge
 10. Keep `PORTAL_SEND_ENABLED=false` for fresh installations until release is approved. Keep previews disabled outside controlled tests.
 11. Deploy, check the build, and verify that other email addresses cannot enter or call protected server routes.
 12. Enable production delivery with `PORTAL_SEND_ENABLED=true` and redeploy when the owner authorizes release.
+13. Configure `PORTAL_GITHUB_TOKEN` privately for manual draft controls. See the draft setup instructions below.
 
 For command-line deployment, run from the repository root because the project root is `portal/`:
 

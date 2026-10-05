@@ -280,3 +280,13 @@ Preview's missing settings tabs were initialized from existing settings, preserv
 No draft was created and no email was sent during implementation.
 The runtime GitHub token was absent when implementation began. It must be configured privately in Vercel.
 Preview drafting remains blocked until its isolated GitHub credentials and readiness setting are configured.
+
+Released through PR #3 to `main` at merge commit `8b98cfab95564eddfbcd119ec36d71847f08350d`.
+Both implementation and merge commits include `[skip ci]` to honor the owner's request not to run tests.
+Re-enabled the fixed newsletter workflow using the existing repository credential after initializing the automatic flag Off.
+GitHub reports the workflow active. The enable action triggered no draft run.
+Production cloud build completed with the new interfaces and required TypeScript compilation.
+Deployment `dpl_7afQknBZ7UUSyyBnGwxA2guQZCkt` is READY at the stable production address.
+The manual control remains unavailable until the owner adds the scoped runtime token in Vercel and the site is redeployed.
+Preview cloud build also completed. Stable preview points to `dpl_7TMSfBrHRBatzNmyTxUwTXTUoZXX`.
+Preview draft dispatch and newsletter sending remain disabled. No browser or functional release checks were performed.
