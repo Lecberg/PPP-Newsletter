@@ -1,16 +1,35 @@
 name: Hong Kong PPP Weekly Newsletter
+run-name: PPP draft ${{ inputs.environment || 'production' }} ${{ inputs.request_id || github.run_id }}
 
 on:
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: Portal request number (leave blank for a new direct request)
+        type: string
+        required: false
+      environment:
+        description: Draft environment
+        type: choice
+        options: [production, preview]
+        default: production
   schedule:
     # Runs hourly; the client controls the actual delivery day/time from the
     # Config tab of the Google Sheet. `run-scheduled` exits early unless the
     # current hour matches the configured slot.
     - cron: "0 * * * *"
 
+permissions:
+  contents: read
+concurrency:
+  group: ppp-newsletter-drafting-${{ inputs.environment || 'production' }}
+  cancel-in-progress: false
+  queue: max
+
 jobs:
   draft-newsletter:
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -18,7 +37,7 @@ jobs:
           python-version: "3.11"
       - name: Install dependencies
         run: pip install -e .
-      - name: Run weekly newsletter pipeline
+      - name: Create draft or check automatic schedule
         env:
           OPENAI_COMPATIBLE_API_KEY: ${{ secrets.OPENAI_COMPATIBLE_API_KEY }}
           OPENAI_COMPATIBLE_BASE_URL: ${{ secrets.OPENAI_COMPATIBLE_BASE_URL }}
@@ -29,4 +48,26 @@ jobs:
           BREVO_SENDER_EMAIL: ${{ secrets.BREVO_SENDER_EMAIL }}
           BREVO_SENDER_NAME: ${{ secrets.BREVO_SENDER_NAME }}
           BREVO_LIST_ID: ${{ secrets.BREVO_LIST_ID }}
-        run: python -m newsletter run-scheduled
+          PORTAL_PREVIEW_GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.PORTAL_PREVIEW_GOOGLE_SERVICE_ACCOUNT_JSON }}
+          PORTAL_PREVIEW_GOOGLE_SHEET_ID: ${{ secrets.PORTAL_PREVIEW_GOOGLE_SHEET_ID }}
+          PORTAL_PREVIEW_BREVO_API_KEY: ${{ secrets.PORTAL_PREVIEW_BREVO_API_KEY }}
+          PORTAL_PREVIEW_BREVO_LIST_ID: ${{ secrets.PORTAL_PREVIEW_BREVO_LIST_ID }}
+          PORTAL_PREVIEW_BREVO_SENDER_EMAIL: ${{ secrets.PORTAL_PREVIEW_BREVO_SENDER_EMAIL }}
+          PORTAL_PREVIEW_BREVO_SENDER_NAME: ${{ secrets.PORTAL_PREVIEW_BREVO_SENDER_NAME }}
+          DRAFT_ENVIRONMENT: ${{ inputs.environment || 'production' }}
+          DRAFT_REQUEST_ID: ${{ inputs.request_id }}
+          DRAFT_EVENT: ${{ github.event_name }}
+        shell: bash
+        run: |
+          args=(--environment "$DRAFT_ENVIRONMENT" --result-path draft-result.json)
+          if [ -n "$DRAFT_REQUEST_ID" ]; then args+=(--request-id "$DRAFT_REQUEST_ID"); fi
+          if [ "$DRAFT_EVENT" = "schedule" ]; then args+=(--scheduled); fi
+          python -m newsletter.drafting "${args[@]}"
+      - name: Save draft result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: draft-result-${{ github.run_id }}
+          path: draft-result.json
+          if-no-files-found: ignore
+          retention-days: 30

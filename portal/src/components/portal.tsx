@@ -4,6 +4,7 @@ import { signOut } from "next-auth/react";
 import { approvalDate, issueDate, statusLabel } from "@/lib/display";
 import { isolatedPreview } from "@/lib/preview";
 import type { IssueDetail, IssueRecipients, IssueRow, Recipient } from "@/lib/types";
+import { DraftControls, Settings } from "./drafting";
 
 async function request<T>(path: string, method = "GET", body?: unknown): Promise<T> {
   const response = await fetch(path, { method, cache: "no-store", headers: { "Content-Type": "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -22,14 +23,16 @@ function Dialog({ title, children, close, busy = false }: { title: string; child
 }
 
 export function Portal({ email, demo }: { email: string; demo: boolean }) {
-  const [tab, setTab] = useState<"newsletter" | "recipients">("newsletter");
+  const [tab, setTab] = useState<"newsletter" | "recipients" | "settings">("newsletter");
   const [campaignId, setCampaignId] = useState<number | null>(null);
+  const [settingsDirty,setSettingsDirty]=useState(false);
+  function switchTab(next:"newsletter"|"recipients"|"settings") { if(tab==="settings"&&next!==tab&&settingsDirty&&!window.confirm("Discard your unsaved settings?"))return;setTab(next); }
   return <>
     <header className="site-header"><a className="brand" href="/">Hong Kong PPP Weekly</a>
-      <nav aria-label="Portal"><button className={tab === "newsletter" ? "active" : ""} aria-current={tab === "newsletter" ? "page" : undefined} onClick={() => setTab("newsletter")}>Newsletter</button><button className={tab === "recipients" ? "active" : ""} aria-current={tab === "recipients" ? "page" : undefined} onClick={() => setTab("recipients")}>Recipients</button></nav>
+      <nav aria-label="Portal"><button className={tab === "newsletter" ? "active" : ""} aria-current={tab === "newsletter" ? "page" : undefined} onClick={() => switchTab("newsletter")}>Newsletter</button><button className={tab === "recipients" ? "active" : ""} aria-current={tab === "recipients" ? "page" : undefined} onClick={() => switchTab("recipients")}>Recipients</button><button className={tab === "settings" ? "active" : ""} aria-current={tab === "settings" ? "page" : undefined} onClick={() => switchTab("settings")}>Settings</button></nav>
       <button className="text-button sign-out" title={`Signed in as ${email}`} onClick={() => signOut({ redirectTo: "/login" })}>Sign out</button>
     </header>
-    <main className="page">{tab === "newsletter" ? <Newsletter manageRecipients={() => setTab("recipients")} demo={demo} campaignId={campaignId} onCampaignChange={setCampaignId} /> : <Recipients campaignId={campaignId} onCampaignChange={setCampaignId} />}</main>
+    <main className="page">{tab === "newsletter" ? <Newsletter manageRecipients={() => setTab("recipients")} demo={demo} campaignId={campaignId} onCampaignChange={setCampaignId} /> : tab === "recipients" ? <Recipients campaignId={campaignId} onCampaignChange={setCampaignId} /> : <Settings demo={demo} onDirtyChange={setSettingsDirty} />}</main>
     {demo && <div className="demo-banner" role="status">Local demonstration · sample content and contacts · delivery is simulated</div>}
     <footer className="site-footer"><span>Hong Kong PPP Weekly</span><span>{email}</span></footer>
   </>;
@@ -66,6 +69,7 @@ function Newsletter({ manageRecipients, demo, campaignId, onCampaignChange }: { 
   }
   return <>
     <div className="page-heading"><div><h1>Review newsletter</h1><p>Read the draft, check recipients, then confirm delivery.</p></div><button className="text-button refresh" onClick={() => load(activeId ?? undefined, true)} disabled={loading || busy}>Refresh status</button></div>
+    <DraftControls demo={demo} onReady={id=>void load(id,true)} />
     {error && <Notice message={error} error />}{message && <Notice message={message} />}
     {loading && <div className="loading" role="status">Loading newsletter…</div>}
     {!loading && !issue && !error && <div className="empty-state"><h2>Your next issue will appear here.</h2><p>Once the newsletter process creates a Brevo draft, you can review it and confirm delivery.</p></div>}

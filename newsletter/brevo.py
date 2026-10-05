@@ -18,7 +18,7 @@ def brevo_config_issues(settings: Settings) -> list[str]:
     return issues
 
 
-def create_draft_campaign(settings: Settings, subject: str, html: str) -> str:
+def create_draft_campaign(settings: Settings, subject: str, html: str, *, request_id: str | None = None) -> str:
     if brevo_config_issues(settings):
         return ""
 
@@ -30,7 +30,7 @@ def create_draft_campaign(settings: Settings, subject: str, html: str) -> str:
             "Accept": "application/json",
         },
         json={
-            "name": subject,
+            "name": f"{subject} [portal:{request_id}]" if request_id else subject,
             "subject": subject,
             "sender": {
                 "name": settings.brevo_sender_name,
@@ -45,6 +45,8 @@ def create_draft_campaign(settings: Settings, subject: str, html: str) -> str:
     try:
         response.raise_for_status()
     except requests.HTTPError as exc:
+        if request_id:
+            raise
         detail = response.text[:800]
         raise RuntimeError(f"Brevo campaign creation failed: HTTP {response.status_code}: {detail}") from exc
     return str(response.json().get("id", ""))

@@ -143,9 +143,10 @@ HTML_TEMPLATE = Template(
 )
 
 
-def render_newsletter(articles: list[Article], output_dir: Path | None = None) -> tuple[str, str, Path]:
-    issue_date = date.today().isoformat()
-    display_date = date.today().strftime("%d %B %Y")
+def render_newsletter(articles: list[Article], output_dir: Path | None = None, issue_day: date | None = None) -> tuple[str, str, Path]:
+    issue_day = issue_day or date.today()
+    issue_date = issue_day.isoformat()
+    display_date = issue_day.strftime("%d %B %Y")
     subject = f"Hong Kong PPP Weekly Brief - {issue_date}"
     grouped = defaultdict(list)
     selected_articles = [

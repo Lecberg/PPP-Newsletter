@@ -259,3 +259,24 @@ No recipient details or choices were changed. Screenshot: `portal-ready-producti
 All nine protected-route checks returned HTTP 401 with private, no-store headers without portal login.
 Per-issue choices, unsubscribe protection, shared locks, fresh review checks, and uncertain-send protection remain active.
 The operating guide now reflects enabled production sending and the owner's waiver.
+
+## Settings and draft controls — 5 October 2026
+
+The owner requested portal editing of Sources and Config, immediate manual drafts, and an automatic-drafting switch.
+Both approved accounts receive the same controls. Sheets remains the settings store.
+Settings saves preserve unrelated columns and editing instructions, validate entries, reject stale versions, and record changes in Neon.
+Draft requests have unique numbers, persistent states, and a database constraint limiting active or uncertain requests to one.
+The GitHub workflow separates scheduled checks from immediate requests and prevents overlapping creation without cancelling active work.
+It returns a small campaign result artifact. The portal verifies the matching issue and Brevo campaign before reporting Ready.
+Manual requests can create separate drafts on the same day. Automatic drafting starts Off.
+Time-zone-aware daily checks count only issues containing a successful campaign number.
+Existing article ranking and email delivery confirmation remain unchanged.
+
+The owner explicitly waived automated tests, browser tests, and controlled draft/email tests for this change.
+No such tests were run. A local deployment build completed successfully, including its required TypeScript step.
+Migration 004 was applied to production and preview without deleting existing login, approval, selection, or operation records.
+Initialized only the automatic-drafting flag to Off in production and the isolated preview Sheet.
+Preview's missing settings tabs were initialized from existing settings, preserving its controlled Issues history.
+No draft was created and no email was sent during implementation.
+The runtime GitHub token was absent when implementation began. It must be configured privately in Vercel.
+Preview drafting remains blocked until its isolated GitHub credentials and readiness setting are configured.

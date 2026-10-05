@@ -31,7 +31,13 @@ if (process.env.GOOGLE_SERVICE_ACCOUNT_JSON && process.env.GOOGLE_SHEET_ID) awai
 if (process.env.DATABASE_URL) await check('Neon database and migration', async () => {
   const sql = neon(process.env.DATABASE_URL);
   const [row] = await sql`SELECT to_regclass('portal_approvals') IS NOT NULL AND to_regclass('portal_locks') IS NOT NULL AND to_regclass('portal_operations') IS NOT NULL AND to_regclass('users') IS NOT NULL AND to_regclass('verification_token') IS NOT NULL AND to_regclass('portal_login_limits') IS NOT NULL AS ready`;
-  if (!row.ready || !(await sql`SELECT to_regclass('portal_recipient_selections') IS NOT NULL AS ready`)[0].ready) throw new Error('Migration needed');
+  if (!row.ready || !(await sql`SELECT to_regclass('portal_recipient_selections') IS NOT NULL AND to_regclass('portal_settings_changes') IS NOT NULL AND to_regclass('portal_draft_requests') IS NOT NULL AS ready`)[0].ready) throw new Error('Migration needed');
 });
+if (process.env.PORTAL_GITHUB_TOKEN) await check('GitHub draft workflow', async () => {
+  const response = await fetch('https://api.github.com/repos/Lecberg/PPP-Newsletter/actions/workflows/weekly-newsletter.yml', {headers:{Authorization:'Bearer '+process.env.PORTAL_GITHUB_TOKEN,Accept:'application/vnd.github+json','X-GitHub-Api-Version':'2026-03-10'},signal:AbortSignal.timeout(15000)});
+  if (!response.ok || (await response.json()).state !== 'active') throw new Error('Workflow unavailable');
+});
+else { console.log('GitHub draft control: missing PORTAL_GITHUB_TOKEN'); failed = true; }
+console.log('Preview draft control: ' + (process.env.PORTAL_DRAFT_PREVIEW_READY === 'true' ? 'isolated setup enabled' : 'disabled until isolated GitHub secrets are configured'));
 console.log('Delivery switch: ' + (process.env.PORTAL_SEND_ENABLED === 'true' ? 'enabled' : 'disabled'));
 process.exitCode = failed ? 1 : 0;

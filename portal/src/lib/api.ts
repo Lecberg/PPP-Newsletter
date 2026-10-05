@@ -12,10 +12,10 @@ export function parseId(value: string) {
   if (!/^\d+$/.test(value) || !Number.isSafeInteger(id) || id < 1) throw new PortalError(400, "Invalid contact or campaign number.");
   return id;
 }
-export async function jsonBody<T>(request: Request, schema: z.ZodType<T>) {
+export async function jsonBody<T>(request: Request, schema: z.ZodType<T>, limit = 4096) {
   // Bound raw text too: content-length can be absent or dishonest.
   const raw = await request.text();
-  if (raw.length > 4096) throw new PortalError(413, "This request is too large.");
+  if (raw.length > limit) throw new PortalError(413, "This request is too large.");
   let data;
   try { data = JSON.parse(raw); } catch { throw new PortalError(400, "The request could not be read."); }
   const result = schema.safeParse(data);

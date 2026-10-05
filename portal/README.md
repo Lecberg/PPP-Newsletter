@@ -99,6 +99,46 @@ Never copy live subscriber addresses into the test list.
 
 ## Daily use
 
+### Settings and draft creation
+
+Both approved accounts can use the **Settings** page to manage sources, keywords, and drafting times.
+Google Sheets remains the settings store. Press **Save changes** to apply changes to the next run.
+The current monthly schedule remains day 1 at 08:00 Hong Kong time.
+**Automatic drafting** starts Off. Turning it Off pauses scheduled creation while manual creation remains available.
+GitHub stays enabled and checks the saved schedule hourly. A selected hour is not an exact start-time guarantee.
+Days beyond a month's length use its last day. The configured time zone controls issue dates and daily checks.
+Source priority is retained as existing metadata; it does not change article ranking.
+An empty keyword field restores the generator's default list.
+
+Use **Create draft now**, then **Create draft**, to start immediately using saved settings.
+Each request creates a separate draft, including another draft on the same day. It never sends an email.
+A successful manual draft counts toward that day's scheduled draft requirement.
+The portal shows queued, creating, ready, failed, or uncertain progress. **Open draft** opens a completed result.
+While a request is active or uncertain, another request is blocked. Progress refreshes every 15 seconds while visible.
+Do not rerun a draft workflow in GitHub. After a definite failure, submit a fresh portal request instead.
+Contact the owner for an uncertain outcome. Check GitHub and Brevo before resolving its database record.
+Campaign names include `[portal:<request number>]` to help locate a campaign after an uncertain creation response.
+An unresolved settings save also blocks further saves. Check the actual Sheet and stopped request before resolving its audit record.
+
+GitHub setup requires `PORTAL_GITHUB_TOKEN` in Vercel: a fine-grained token for only `Lecberg/PPP-Newsletter`.
+Grant Actions read/write and Contents read-only. Store it privately on the server; never paste it into the portal or logs.
+Production dispatches only `weekly-newsletter.yml` on `main`. Keep that workflow enabled.
+Deployments do not need access to any other repository. Renew the token before its chosen expiry date.
+
+Preview dispatch is disabled until isolated GitHub resources are configured.
+Set `PORTAL_DRAFT_REF` to the preview implementation branch. Configure these GitHub repository secrets:
+`PORTAL_PREVIEW_GOOGLE_SERVICE_ACCOUNT_JSON`, `PORTAL_PREVIEW_GOOGLE_SHEET_ID`,
+`PORTAL_PREVIEW_BREVO_API_KEY`, `PORTAL_PREVIEW_BREVO_LIST_ID`,
+`PORTAL_PREVIEW_BREVO_SENDER_EMAIL`, and `PORTAL_PREVIEW_BREVO_SENDER_NAME`.
+Use preview's separate Sheet and test list. The runner refuses missing preview credentials or production targets.
+Only then set preview's `PORTAL_DRAFT_PREVIEW_READY=true` and redeploy preview.
+The token's runtime permissions do not allow adding these repository secrets; the owner configures them privately in GitHub.
+
+Migration `004_settings_drafting.sql` adds request and settings audit records without deleting existing records.
+`node --env-file=.env.local scripts/drafting-setup.mjs` initializes only the automatic switch to Off.
+An optional `--preview-sheet <separate-sheet-id>` prepares missing preview settings tabs from existing settings.
+Do not rerun this setup command once clients start using the automatic switch unless intentionally pausing it.
+
 1. Enter an approved email address and select **Send login link**. Check your inbox and spam folder.
 2. Open the email link and select **Continue to portal**. Opening the page alone does not use the link.
 3. Open **Newsletter** and read the draft. **Previous issues** opens issue history.

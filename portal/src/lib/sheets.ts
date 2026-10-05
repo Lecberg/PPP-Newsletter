@@ -19,7 +19,7 @@ export function parseIssues(values: string[][]): IssueRow[] {
   return [...found.values()].sort((a, b) => b.date.localeCompare(a.date) || b.campaignId - a.campaignId);
 }
 export class SheetsClient implements SheetPort {
-  private async request<T>(suffix: string, method = "GET", body?: unknown): Promise<T> {
+  async request<T>(suffix: string, method = "GET", body?: unknown): Promise<T> {
     let credentials;
     try { credentials = JSON.parse(required("GOOGLE_SERVICE_ACCOUNT_JSON")); }
     catch { throw new PortalError(503, "Google Sheets credentials need to be configured by the site owner."); }
@@ -31,7 +31,7 @@ export class SheetsClient implements SheetPort {
       headers: { Authorization: `Bearer ${token.token}`, "Content-Type": "application/json" },
       body: body === undefined ? undefined : JSON.stringify(body)
     });
-    if (!response.ok) throw new PortalError(503, "The portal could not read or update the Issues sheet.");
+    if (!response.ok) throw new PortalError(503, "The portal could not read or update Google Sheets.");
     return response.json() as Promise<T>;
   }
   private async values() {

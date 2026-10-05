@@ -7,9 +7,9 @@ portal or sends the campaign inside Brevo.
 
 The new [private portal](portal/README.md) lets the owner and one client review drafts,
 manage newsletter recipients, and approve immediate delivery through Brevo.
-It lives in `portal/` and deploys separately on Vercel. Google Sheets still controls
-sources, keywords, and draft scheduling. Portal delivery stays disabled until setup
-and a controlled test delivery are complete.
+It lives in `portal/` and deploys separately on Vercel. Its Settings page edits
+sources, keywords, and draft scheduling in Google Sheets. It can also request an
+immediate draft through GitHub. Production delivery was enabled at the owner's request.
 
 ## Setup
 
@@ -35,7 +35,10 @@ python -m newsletter run-scheduled
 `run-scheduled` runs the full pipeline **only if** the current time matches the
 delivery slot configured in the `Config` tab (see below). The GitHub Actions
 workflow fires hourly and calls `run-scheduled`, so the client controls timing
-from the spreadsheet without any code change.
+from the spreadsheet or portal without a code change. The GitHub workflow uses
+`python -m newsletter.drafting --scheduled`; manual requests omit `--scheduled`.
+Scheduled drafting requires `automatic_drafting_enabled=TRUE`. It starts Off.
+Manual requests create separate drafts regardless of the switch or daily schedule.
 
 If Google Sheets credentials are missing, the app uses `.newsletter_data/` JSON files so the pipeline can be tested locally.
 
