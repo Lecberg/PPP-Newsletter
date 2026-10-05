@@ -20,9 +20,9 @@ DEFAULT_LOOKBACK_DAYS = 31
 MIN_RELEVANCE_SCORE = 10
 
 
-def collect(limit_per_source: int = DEFAULT_LIMIT_PER_SOURCE) -> list[Article]:
-    settings = get_settings()
-    store = get_store(settings)
+def collect(limit_per_source: int = DEFAULT_LIMIT_PER_SOURCE, *, settings=None, store=None) -> list[Article]:
+    settings = settings or get_settings()
+    store = store or get_store(settings)
     keywords = parse_keywords(store.read_config().get("keywords"))
     collected: list[Article] = []
     for source in store.read_sources():
@@ -37,9 +37,9 @@ def collect(limit_per_source: int = DEFAULT_LIMIT_PER_SOURCE) -> list[Article]:
     return merged
 
 
-def generate(max_items: int = DEFAULT_MAX_ITEMS, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> tuple[str, str, str]:
-    settings = get_settings()
-    store = get_store(settings)
+def generate(max_items: int = DEFAULT_MAX_ITEMS, lookback_days: int = DEFAULT_LOOKBACK_DAYS, *, settings=None, store=None, issue_day: date | None = None) -> tuple[str, str, str]:
+    settings = settings or get_settings()
+    store = store or get_store(settings)
     articles = store.read_articles()
     eligible = [
         article
@@ -56,10 +56,10 @@ def generate(max_items: int = DEFAULT_MAX_ITEMS, lookback_days: int = DEFAULT_LO
     for article in articles:
         updated.append(summarized_by_url.get(article.url, article))
     store.write_articles(updated)
-    subject, html, html_path = render_newsletter(draft_articles, settings.local_data_dir)
+    subject, html, html_path = render_newsletter(draft_articles, settings.local_data_dir, issue_day)
     store.append_issue(
         {
-            "issue_date": date.today().isoformat(),
+            "issue_date": (issue_day or date.today()).isoformat(),
             "newsletter_subject": subject,
             "brevo_campaign_id": "",
             "approval_status": "draft_created",
@@ -75,9 +75,9 @@ def generate(max_items: int = DEFAULT_MAX_ITEMS, lookback_days: int = DEFAULT_LO
     return subject, html, str(html_path)
 
 
-def create_campaign(max_items: int = DEFAULT_MAX_ITEMS, lookback_days: int = DEFAULT_LOOKBACK_DAYS) -> str:
-    settings = get_settings()
-    store = get_store(settings)
+def create_campaign(max_items: int = DEFAULT_MAX_ITEMS, lookback_days: int = DEFAULT_LOOKBACK_DAYS, *, settings=None, store=None, issue_day: date | None = None) -> str:
+    settings = settings or get_settings()
+    store = store or get_store(settings)
     articles = [
         article
         for article in store.read_articles()
@@ -85,11 +85,11 @@ def create_campaign(max_items: int = DEFAULT_MAX_ITEMS, lookback_days: int = DEF
         and _is_newsletter_candidate(article, lookback_days=lookback_days, min_score=MIN_RELEVANCE_SCORE)
     ]
     articles = sorted(articles, key=lambda item: item.relevance_score, reverse=True)
-    subject, html, html_path = render_newsletter(articles[:max_items], settings.local_data_dir)
+    subject, html, html_path = render_newsletter(articles[:max_items], settings.local_data_dir, issue_day)
     campaign_id = create_draft_campaign(settings, subject, html)
     store.append_issue(
         {
-            "issue_date": date.today().isoformat(),
+            "issue_date": (issue_day or date.today()).isoformat(),
             "newsletter_subject": subject,
             "brevo_campaign_id": campaign_id,
             "approval_status": "draft_created",
@@ -110,9 +110,15 @@ def run_weekly(
     max_items: int = DEFAULT_MAX_ITEMS,
     lookback_days: int = DEFAULT_LOOKBACK_DAYS,
 ) -> None:
-    collect(limit_per_source=limit_per_source)
-    generate(max_items=max_items, lookback_days=lookback_days)
-    create_campaign(max_items=max_items, lookback_days=lookback_days)
+    settings = get_settings()
+    store = get_store(settings)
+    config, sources = store.draft_settings_snapshot() if hasattr(store, "draft_settings_snapshot") else (store.read_config(), store.read_sources())
+    from .drafting import SnapshotStore
+    snapshot = SnapshotStore(store, config, sources)
+    issue_day = datetime.now(timezone.utc).astimezone(Schedule.from_config(config).tzinfo()).date()
+    collect(limit_per_source=limit_per_source, settings=settings, store=snapshot)
+    generate(max_items=max_items, lookback_days=lookback_days, settings=settings, store=snapshot, issue_day=issue_day)
+    create_campaign(max_items=max_items, lookback_days=lookback_days, settings=settings, store=snapshot, issue_day=issue_day)
 
 
 def run_scheduled(
@@ -128,7 +134,11 @@ def run_scheduled(
     """
     settings = get_settings()
     store = get_store(settings)
-    schedule = Schedule.from_config(store.read_config())
+    config = store.read_config()
+    if str(config.get("automatic_drafting_enabled", "")).strip().lower() not in {"true", "yes", "1", "enabled"}:
+        print("[skip] automatic drafting is off.")
+        return False
+    schedule = Schedule.from_config(config)
     now = now or datetime.now(timezone.utc)
 
     if not schedule.matches(now):
@@ -139,7 +149,7 @@ def run_scheduled(
         )
         return False
 
-    if _already_ran_today(store, now):
+    if _already_ran_today(store, now.astimezone(schedule.tzinfo())):
         print("[skip] an issue was already created today; not drafting again.")
         return False
 
@@ -156,10 +166,9 @@ def _already_ran_today(store, now: datetime) -> bool:
     today = now.date().isoformat()
     try:
         issues = store.read_issues()
-    except Exception as exc:  # never let the guard crash the run
-        print(f"[warn] could not read issue history: {exc}")
-        return False
-    return any(str(issue.get("issue_date", "")).strip() == today for issue in issues)
+    except Exception as exc:
+        raise RuntimeError("Issue history could not be checked. Drafting stopped to avoid duplicates.") from exc
+    return any(str(issue.get("issue_date", "")).strip() == today and str(issue.get("brevo_campaign_id", "")).isdigit() and int(str(issue["brevo_campaign_id"])) > 0 for issue in issues)
 
 
 def _is_newsletter_candidate(

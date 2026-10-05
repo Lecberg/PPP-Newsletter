@@ -16,6 +16,7 @@ def default_config_rows() -> list[dict[str, str]]:
     """Seed rows for the Config tab: keywords plus client-editable schedule keys."""
     rows = [{"key": "keywords", "value": "\n".join(DEFAULT_KEYWORDS)}]
     rows.extend({"key": key, "value": value} for key, value in DEFAULT_SCHEDULE.items())
+    rows.append({"key": "automatic_drafting_enabled", "value": "FALSE"})
     return rows
 
 
@@ -86,7 +87,7 @@ class SheetStore:
         self._ensure_worksheet("Articles", ARTICLE_HEADERS, [])
         self._ensure_worksheet("Issues", ISSUE_HEADERS, [])
         self._ensure_worksheet("Config", CONFIG_HEADERS, default_config_rows())
-        self._ensure_config_keys(DEFAULT_SCHEDULE)
+        self._ensure_config_keys({**DEFAULT_SCHEDULE, "automatic_drafting_enabled": "FALSE"})
 
     def _ensure_config_keys(self, defaults: dict[str, str]) -> None:
         """Append any missing schedule keys so the client has rows to edit."""
@@ -102,19 +103,31 @@ class SheetStore:
             worksheet.append_rows(missing)
 
     def _ensure_worksheet(self, title: str, headers: list[str], seed_rows: list[dict]) -> None:
+        created = False
         try:
             worksheet = self.sheet.worksheet(title)
         except self.gspread.WorksheetNotFound:
             worksheet = self.sheet.add_worksheet(title=title, rows=max(100, len(seed_rows) + 10), cols=len(headers) + 2)
             worksheet.update([headers])
+            created = True
         values = worksheet.get_all_values()
         if not values:
             worksheet.update([headers])
-        if seed_rows and len(worksheet.get_all_records()) == 0:
+            created = True
+        if seed_rows and created:
             worksheet.append_rows([[row.get(header, "") for header in headers] for row in seed_rows])
 
     def read_sources(self) -> list[Source]:
-        return [Source.from_row(row) for row in self.sheet.worksheet("Sources").get_all_records()]
+        return [Source.from_row(row) for row in self.sheet.worksheet("Sources").get_all_records() if str(row.get("name", "")).strip() or str(row.get("url", "")).strip()]
+
+    def draft_settings_snapshot(self) -> tuple[dict[str, str], list[Source]]:
+        data = self.sheet.values_batch_get(["Config!A:AZ", "Sources!A:AZ"])
+        config_values, source_values = [part.get("values", []) for part in data["valueRanges"]]
+        def records(values):
+            return [dict(zip(values[0], row + [""] * (len(values[0]) - len(row)))) for row in values[1:]] if values else []
+        config = {str(row.get("key", "")).strip(): str(row.get("value", "")) for row in records(config_values) if str(row.get("key", "")).strip()}
+        sources = [Source.from_row(row) for row in records(source_values) if str(row.get("name", "")).strip() or str(row.get("url", "")).strip()]
+        return config, sources
 
     def read_config(self) -> dict[str, str]:
         config: dict[str, str] = {}

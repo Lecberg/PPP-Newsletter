@@ -1,0 +1,11 @@
+*
+!portal
+!portal/**
+portal/.env*
+portal/node_modules/
+portal/.next/
+portal/.vercel/
+portal/docs/
+portal/tests/
+portal/coverage/
+portal/*.tsbuildinfo
