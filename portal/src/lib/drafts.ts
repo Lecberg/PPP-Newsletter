@@ -33,7 +33,11 @@ export class DraftService {
     if(info.workflow_id!==workflow.id||info.display_title!==`PPP draft ${this.github.environment} ${current.requestId}`) throw new PortalError(503,"The workflow run does not match this draft request.");
     if(info.status!=="completed") return {...current,...await this.update(current.requestId,info.status==="in_progress"?"running":"queued",runId,null,null)};
     const result=await this.github.result(runId,current.requestId);
-    if(!result) return {...current,...await this.update(current.requestId,"unknown",runId,null,"The workflow finished without a confirmed draft result. Contact the site owner.")};
+    if(!result) {
+      // A later attempt cannot prove that the original attempt created nothing.
+      if(info.conclusion==="failure"&&info.run_attempt===1&&await this.github.failedBeforeDrafting(runId)) return {...current,...await this.update(current.requestId,"failed",runId,null,"GitHub setup failed before draft creation started. No draft was created. Submit a fresh request after setup is fixed.")};
+      return {...current,...await this.update(current.requestId,"unknown",runId,null,"The workflow finished without a confirmed draft result. Contact the site owner.")};
+    }
     if(result.outcome==="unknown") return {...current,...await this.update(current.requestId,"unknown",runId,null,"Campaign creation is uncertain. Contact the site owner before creating another draft.")};
     if(result.outcome!=="ready"||!Number.isSafeInteger(result.campaign_id)||Number(result.campaign_id)<1) return {...current,...await this.update(current.requestId,"failed",runId,null,"Draft creation did not finish. Review the workflow with the site owner, then submit a fresh request.")};
     const campaignId=result.campaign_id!;
