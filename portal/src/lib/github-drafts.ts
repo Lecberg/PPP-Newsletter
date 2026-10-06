@@ -44,7 +44,20 @@ export class GitHubDrafts {
   async run(runId:number) {
     const response=await this.request(`runs/${runId}`);
     if(!response.ok) throw new PortalError(503,"GitHub progress could not be refreshed.");
-    return await response.json() as {id:number;workflow_id:number;status:string;conclusion:string|null;display_title:string};
+    return await response.json() as {id:number;workflow_id:number;status:string;conclusion:string|null;display_title:string;run_attempt:number};
+  }
+  async failedBeforeDrafting(runId:number) {
+    const response=await this.request(`runs/${runId}/jobs?filter=latest&per_page=100`);
+    if(!response.ok) throw new PortalError(503,"GitHub setup progress could not be read.");
+    const value=await response.json() as {total_count:number;jobs:{name:string;status:string;conclusion:string|null;steps:{name:string;number:number;status:string;conclusion:string|null}[]}[]};
+    // Only the known single-job workflow can prove that creation never started.
+    if(value.total_count!==1||value.jobs.length!==1) return false;
+    const job=value.jobs[0];
+    if(job.name!=="draft-newsletter"||job.status!=="completed"||job.conclusion!=="failure") return false;
+    const draftSteps=job.steps.filter(step=>step.name==="Create draft or check automatic schedule");
+    if(draftSteps.length!==1) return false;
+    const draft=draftSteps[0];
+    return draft.status==="completed"&&draft.conclusion==="skipped"&&job.steps.some(step=>step.number<draft.number&&step.status==="completed"&&step.conclusion==="failure");
   }
   async result(runId:number,requestId:string) {
     const response=await this.request(`runs/${runId}/artifacts?per_page=100`);

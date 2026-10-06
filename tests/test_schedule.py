@@ -58,7 +58,7 @@ def _patch(monkeypatch, store, ran):
 
 
 def test_run_scheduled_skips_outside_slot(monkeypatch):
-    store = FakeStore(config={})  # default: Monday 08:00 HK
+    store = FakeStore(config={"automatic_drafting_enabled": "TRUE"})  # default: Monday 08:00 HK
     ran = []
     _patch(monkeypatch, store, ran)
     # Tuesday -> should not run.
@@ -68,7 +68,7 @@ def test_run_scheduled_skips_outside_slot(monkeypatch):
 
 
 def test_run_scheduled_runs_inside_slot(monkeypatch):
-    store = FakeStore(config={})
+    store = FakeStore(config={"automatic_drafting_enabled": "TRUE"})
     ran = []
     _patch(monkeypatch, store, ran)
     did_run = cli.run_scheduled(now=datetime(2026, 8, 10, 0, 0, tzinfo=timezone.utc))
@@ -77,9 +77,17 @@ def test_run_scheduled_runs_inside_slot(monkeypatch):
 
 
 def test_run_scheduled_skips_when_already_ran_today(monkeypatch):
-    store = FakeStore(config={}, issues=[{"issue_date": "2026-08-10"}])
+    store = FakeStore(config={"automatic_drafting_enabled": "TRUE"}, issues=[{"issue_date": "2026-08-10", "brevo_campaign_id": "123"}])
     ran = []
     _patch(monkeypatch, store, ran)
     did_run = cli.run_scheduled(now=datetime(2026, 8, 10, 0, 0, tzinfo=timezone.utc))
     assert did_run is False
+    assert ran == []
+
+
+def test_run_scheduled_stays_off_by_default(monkeypatch):
+    store = FakeStore(config={})
+    ran = []
+    _patch(monkeypatch, store, ran)
+    assert cli.run_scheduled(now=datetime(2026, 8, 10, 0, 0, tzinfo=timezone.utc)) is False
     assert ran == []

@@ -1,0 +1,25 @@
+name: Newsletter Python Checks
+
+on:
+  push:
+    paths: ['newsletter/**', 'tests/**', 'pyproject.toml', '.github/workflows/newsletter-checks.yml', '.github/workflows/weekly-newsletter.yml']
+  pull_request:
+    paths: ['newsletter/**', 'tests/**', 'pyproject.toml', '.github/workflows/newsletter-checks.yml', '.github/workflows/weekly-newsletter.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install newsletter and test dependencies
+        run: python -m pip install -e '.[dev]'
+      - name: Check draft runner imports
+        run: python -m newsletter.drafting --help
+      - name: Run newsletter tests
+        run: python -m pytest
