@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent } from "react";
+import { watchEmailLogin } from "@/lib/login-tabs";
 
 export function EmailLoginForm({ ready }: { ready: boolean }) {
   const [email, setEmail] = useState("");
@@ -7,6 +8,8 @@ export function EmailLoginForm({ ready }: { ready: boolean }) {
   const [remaining, setRemaining] = useState(0);
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const stopWaiting = useRef<(() => void) | null>(null);
+  useEffect(() => () => stopWaiting.current?.(), []);
   useEffect(() => {
     if (!remaining) return;
     const timer = setTimeout(() => setRemaining(remaining - 1), 1000);
@@ -21,6 +24,11 @@ export function EmailLoginForm({ ready }: { ready: boolean }) {
       const body = await response.json();
       if (!response.ok) throw new Error(body.error || "We could not send a link. Please try again shortly.");
       setMessage(body.message); setRemaining(60);
+      stopWaiting.current?.();
+      stopWaiting.current = watchEmailLogin(email, () => {
+        try { window.focus(); } catch { /* Opening the portal still works if focus is blocked. */ }
+        window.location.replace("/");
+      });
     } catch (cause) { setError(cause instanceof Error ? cause.message : "We could not send a link. Please try again shortly."); }
     finally { setBusy(false); }
   }
@@ -29,6 +37,7 @@ export function EmailLoginForm({ ready }: { ready: boolean }) {
     <input id="login-email" name="email" type="email" autoComplete="email" required maxLength={254} value={email} onChange={event => setEmail(event.target.value)} disabled={busy || !ready} placeholder="you@example.com" />
     <button className="button primary full-width" disabled={!ready || busy || remaining > 0}>{busy ? "Sending link…" : remaining ? `Send again in ${remaining}s` : "Send login link"}</button>
     {message && <p className="notice success" role="status">{message}</p>}
+    {message && <p className="login-footnote">Keep this tab open. It will enter the portal after you confirm your email link.</p>}
     {error && <p className="notice error" role="alert">{error}</p>}
     <p className="login-footnote">Your link works once and expires in 10 minutes. No password needed.</p>
   </form>;
