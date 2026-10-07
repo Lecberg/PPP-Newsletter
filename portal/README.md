@@ -220,6 +220,9 @@ Monitor Vercel runtime errors and unresolved approval states after deployment.
 If Brevo reaches its request limit, the portal shows the supplied reset time in Hong Kong time.
 Wait until that time before refreshing. Delivery requests are never repeated automatically.
 Issue history loads in batches. Recipient choices refresh only the chosen issue, reducing provider requests.
+Visited portal tabs retain their preview, search, and unsaved edits until the page is closed or reloaded.
+Switching tabs does not fetch their contents again. Saved recipient changes refresh delivery details when Newsletter is shown.
+Refresh controls remain available to check for changes made elsewhere.
 To stop sending, set `PORTAL_SEND_ENABLED=false` and redeploy.
 Restore the previous Vercel deployment to roll back code. Keep the additive database tables.
 

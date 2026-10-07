@@ -53,10 +53,9 @@ export function DraftControls({onReady,demo}:{onReady:(id:number)=>void;demo:boo
   </section>;
 }
 
-export function Settings({demo,onDirtyChange}:{demo:boolean;onDirtyChange:(dirty:boolean)=>void}) {
+export function Settings({demo}:{demo:boolean}) {
   const [settings,setSettings]=useState<PortalSettings|null>(null),[busy,setBusy]=useState(false),[loading,setLoading]=useState(true),[error,setError]=useState(""),[message,setMessage]=useState("");
   const [dirty,setDirty]=useState(false);
-  useEffect(()=>{onDirtyChange(dirty);return()=>onDirtyChange(false);},[dirty,onDirtyChange]);
   async function load() {setLoading(true);setError("");try {setSettings(await request<PortalSettings>("/api/settings"));setDirty(false);}catch(e){setError((e as Error).message);}finally{setLoading(false);}}
   useEffect(()=>{if(demo){setLoading(false);return;}void load();},[demo]);
   useEffect(()=>{const warn=(event:BeforeUnloadEvent)=>{if(dirty){event.preventDefault();event.returnValue="";}};window.addEventListener("beforeunload",warn);return()=>window.removeEventListener("beforeunload",warn);},[dirty]);

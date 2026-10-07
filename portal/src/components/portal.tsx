@@ -25,25 +25,36 @@ function Dialog({ title, children, close, busy = false }: { title: string; child
 export function Portal({ email, demo }: { email: string; demo: boolean }) {
   const [tab, setTab] = useState<"newsletter" | "recipients" | "settings">("newsletter");
   const [campaignId, setCampaignId] = useState<number | null>(null);
-  const [settingsDirty,setSettingsDirty]=useState(false);
-  function switchTab(next:"newsletter"|"recipients"|"settings") { if(tab==="settings"&&next!==tab&&settingsDirty&&!window.confirm("Discard your unsaved settings?"))return;setTab(next); }
+  const [visited, setVisited] = useState({ recipients: false, settings: false });
+  const [recipientsVersion, setRecipientsVersion] = useState(0);
+  const [issueVersion, setIssueVersion] = useState(0);
+  function switchTab(next: typeof tab) {
+    if (next !== "newsletter") setVisited(previous => ({ ...previous, [next]: true }));
+    setTab(next);
+  }
   return <>
     <header className="site-header"><a className="brand" href="/">Hong Kong PPP Weekly</a>
       <nav aria-label="Portal"><button className={tab === "newsletter" ? "active" : ""} aria-current={tab === "newsletter" ? "page" : undefined} onClick={() => switchTab("newsletter")}>Newsletter</button><button className={tab === "recipients" ? "active" : ""} aria-current={tab === "recipients" ? "page" : undefined} onClick={() => switchTab("recipients")}>Recipients</button><button className={tab === "settings" ? "active" : ""} aria-current={tab === "settings" ? "page" : undefined} onClick={() => switchTab("settings")}>Settings</button></nav>
       <button className="text-button sign-out" title={`Signed in as ${email}`} onClick={() => signOut({ redirectTo: "/login" })}>Sign out</button>
     </header>
-    <main className="page">{tab === "newsletter" ? <Newsletter manageRecipients={() => setTab("recipients")} demo={demo} campaignId={campaignId} onCampaignChange={setCampaignId} /> : tab === "recipients" ? <Recipients campaignId={campaignId} onCampaignChange={setCampaignId} /> : <Settings demo={demo} onDirtyChange={setSettingsDirty} />}</main>
+    {/* Keep visited sections mounted so switching tabs preserves previews and edits. */}
+    <main className="page">
+      <div hidden={tab !== "newsletter"}><Newsletter active={tab === "newsletter"} recipientsVersion={recipientsVersion} manageRecipients={() => switchTab("recipients")} demo={demo} campaignId={campaignId} onCampaignChange={setCampaignId} onReviewed={() => setIssueVersion(version => version + 1)} /></div>
+      {visited.recipients && <div hidden={tab !== "recipients"}><Recipients campaignId={campaignId} issueVersion={issueVersion} onCampaignChange={setCampaignId} onChanged={() => setRecipientsVersion(version => version + 1)} /></div>}
+      {visited.settings && <div hidden={tab !== "settings"}><Settings demo={demo} /></div>}
+    </main>
     {demo && <div className="demo-banner" role="status">Local demonstration · sample content and contacts · delivery is simulated</div>}
     <footer className="site-footer"><span>Hong Kong PPP Weekly</span><span>{email}</span></footer>
   </>;
 }
 
-function Newsletter({ manageRecipients, demo, campaignId, onCampaignChange }: { manageRecipients: () => void; demo: boolean; campaignId: number | null; onCampaignChange: (id: number | null) => void }) {
+function Newsletter({ active, recipientsVersion, manageRecipients, demo, campaignId, onCampaignChange, onReviewed }: { active: boolean; recipientsVersion: number; manageRecipients: () => void; demo: boolean; campaignId: number | null; onCampaignChange: (id: number | null) => void; onReviewed: () => void }) {
   const [issues, setIssues] = useState<IssueRow[]>([]), [issue, setIssue] = useState<IssueDetail | null>(null);
   const [activeId, setActiveId] = useState<number | null>(null), [history, setHistory] = useState(false);
   const [loading, setLoading] = useState(true), [error, setError] = useState(""), [message, setMessage] = useState("");
   const [confirm, setConfirm] = useState(false), [busy, setBusy] = useState(false);
   const loadSequence = useRef(0);
+  const loadedRecipientsVersion = useRef(recipientsVersion);
   async function load(id?: number, refreshHistory = false) {
     const sequence = ++loadSequence.current;
     setLoading(true); setError("");
@@ -53,10 +64,17 @@ function Newsletter({ manageRecipients, demo, campaignId, onCampaignChange }: { 
       const detail = chosen ? await request<IssueDetail>(`/api/issues/${chosen}`) : null;
       if (loadSequence.current !== sequence) return;
       setIssues(rows.map(row => row.campaignId === detail?.campaignId ? { ...row, status: detail.status } : row)); setActiveId(chosen ?? null); setIssue(detail); onCampaignChange(chosen ?? null);
-    } catch (e) { if (loadSequence.current === sequence) { setError((e as Error).message); setIssue(null); } }
+      onReviewed();
+    } catch (e) { if (loadSequence.current === sequence) setError((e as Error).message); }
     finally { if (loadSequence.current === sequence) setLoading(false); }
   }
   useEffect(() => { void load(campaignId ?? undefined); return () => { loadSequence.current++; }; }, []);
+  useEffect(() => {
+    // A tab switch alone needs no request. A changed issue or saved recipient choice does.
+    if (!active || (campaignId === activeId && recipientsVersion === loadedRecipientsVersion.current)) return;
+    loadedRecipientsVersion.current = recipientsVersion;
+    void load(campaignId ?? undefined);
+  }, [active, campaignId, recipientsVersion, activeId]);
   async function send() {
     if (!issue || busy) return;
     setBusy(true); setError(""); setMessage("");
@@ -71,9 +89,10 @@ function Newsletter({ manageRecipients, demo, campaignId, onCampaignChange }: { 
     <div className="page-heading"><div><h1>Review newsletter</h1><p>Read the draft, check recipients, then confirm delivery.</p></div><button className="text-button refresh" onClick={() => load(activeId ?? undefined, true)} disabled={loading || busy}>Refresh status</button></div>
     <DraftControls demo={demo} onReady={id=>void load(id,true)} />
     {error && <Notice message={error} error />}{message && <Notice message={message} />}
-    {loading && <div className="loading" role="status">Loading newsletter…</div>}
+    {loading && !issue && <div className="loading" role="status">Loading newsletter…</div>}
+    {loading && issue && <p className="small muted" role="status">Updating delivery details…</p>}
     {!loading && !issue && !error && <div className="empty-state"><h2>Your next issue will appear here.</h2><p>Once the newsletter process creates a Brevo draft, you can review it and confirm delivery.</p></div>}
-    {issue && !loading && <>
+    {issue && <>
       <div className="issue-bar"><strong>{issue.campaignId === issues[0]?.campaignId ? issue.status === "draft" ? "Latest draft" : "Latest issue" : "Previous issue"} — {issueDate(issue.date)}</strong><button className="text-button underline" aria-expanded={history} onClick={() => setHistory(!history)}>Previous issues</button></div>
       {history && <div className="history-list" aria-label="Previous issues">{issues.map(row => <button key={row.campaignId} className={row.campaignId === activeId ? "selected" : ""} onClick={() => { setHistory(false); setMessage(""); void load(row.campaignId); }}><span>{row.subject}{row.status && <small> · {statusLabel(row.status)}</small>}</span><time>{issueDate(row.date)}</time></button>)}</div>}
       <div className="review-layout"><section className="email-preview" aria-label="Newsletter draft"><iframe key={issue.fingerprint} title="Newsletter preview" sandbox="" referrerPolicy="no-referrer" srcDoc={isolatedPreview(issue.html)} /></section>
@@ -81,7 +100,7 @@ function Newsletter({ manageRecipients, demo, campaignId, onCampaignChange }: { 
           <div className="detail-section"><h3>Subject</h3><p>{issue.subject}</p></div>
           <div className="detail-section"><h3>Recipients</h3><div className="recipient-summary"><span>{issue.eligibleCount} selected {issue.eligibleCount === 1 ? "recipient" : "recipients"}</span><button className="text-button underline" onClick={manageRecipients}>Choose recipients</button></div>{issue.recipientCount !== issue.eligibleCount && <p className="muted small">Unsubscribed and unselected recipients are excluded.</p>}</div>
           <div className="detail-section status-section"><h3>Status</h3><p className={issue.status === "sent" ? "sent" : ""}>{statusLabel(issue.status)}</p></div>
-          <button className="button primary full-width" disabled={!issue.canSend || busy} onClick={() => setConfirm(true)}>Confirm delivery</button>
+          <button className="button primary full-width" disabled={!issue.canSend || busy || loading || Boolean(error)} onClick={() => setConfirm(true)}>Confirm delivery</button>
           <p className="delivery-note">{issue.sendDisabledReason ?? "Nothing is sent until you confirm."}</p>
           {issue.approval && <div className="approval-note">Approved by {issue.approval.approvedBy}<br />{approvalDate(issue.approval.approvedAt)}</div>}
         </aside>
@@ -91,7 +110,7 @@ function Newsletter({ manageRecipients, demo, campaignId, onCampaignChange }: { 
   </>;
 }
 
-function Recipients({ campaignId, onCampaignChange }: { campaignId: number | null; onCampaignChange: (id: number | null) => void }) {
+function Recipients({ campaignId, issueVersion, onCampaignChange, onChanged }: { campaignId: number | null; issueVersion: number; onCampaignChange: (id: number | null) => void; onChanged: () => void }) {
   const [people, setPeople] = useState<Recipient[]>([]), [query, setQuery] = useState("");
   const [selected, setSelected] = useState<Recipient | null>(null), [adding, setAdding] = useState(false);
   const [name, setName] = useState(""), [email, setEmail] = useState("");
@@ -99,6 +118,7 @@ function Recipients({ campaignId, onCampaignChange }: { campaignId: number | nul
   const [remove, setRemove] = useState<Recipient | null>(null);
   const [issues, setIssues] = useState<IssueRow[]>([]), [choices, setChoices] = useState<IssueRecipients | null>(null);
   const loadSequence = useRef(0);
+  const loadedCampaign = useRef<number | null | undefined>(undefined);
   function choose(person: Recipient | null) { setSelected(person); setAdding(false); setName(person?.name ?? ""); setEmail(person?.email ?? ""); }
   async function load(initial = false, refreshHistory = false) {
     const sequence = ++loadSequence.current;
@@ -114,7 +134,12 @@ function Recipients({ campaignId, onCampaignChange }: { campaignId: number | nul
     } catch (e) { if (loadSequence.current === sequence) { setError((e as Error).message); setChoices(null); } }
     finally { if (loadSequence.current === sequence) setLoading(false); }
   }
-  useEffect(() => { void load(true); return () => { loadSequence.current++; }; }, [campaignId]);
+  useEffect(() => {
+    const initialize = loadedCampaign.current === undefined || loadedCampaign.current !== campaignId;
+    loadedCampaign.current = campaignId;
+    void load(initialize);
+    return () => { loadSequence.current++; };
+  }, [campaignId, issueVersion]);
   async function toggle(person: Recipient, included: boolean) {
     if (!choices?.canEdit || busy || loading) return;
     setBusy(true); setError(""); setMessage("Saving receiver choice…");
@@ -122,6 +147,7 @@ function Recipients({ campaignId, onCampaignChange }: { campaignId: number | nul
     setChoices({ ...choices, recipients: choices.recipients.map(p => p.id === person.id ? { ...p, included } : p) });
     try {
       await request(`/api/issues/${currentChoices.campaignId}/recipients/${person.id}`, "PATCH", { included, revision: currentChoices.revision });
+      onChanged();
       await load(); setMessage(`${person.name || person.email} ${included ? "will receive" : "will skip"} this issue. Future issues are unchanged.`);
     } catch (e) { await load(); setMessage(""); setError((e as Error).message); }
     finally { setBusy(false); }
@@ -131,13 +157,14 @@ function Recipients({ campaignId, onCampaignChange }: { campaignId: number | nul
     setBusy(true); setError(""); setMessage("");
     try {
       await request(adding ? "/api/recipients" : `/api/recipients/${selected?.id}`, adding ? "POST" : "PATCH", { name: name.trim(), email: email.trim() });
+      onChanged();
       setMessage(adding ? "Recipient added." : "Recipient details saved."); choose(null); await load();
     } catch (e) { setError((e as Error).message); }
     finally { setBusy(false); }
   }
   async function removePerson() {
     if (!remove || busy) return; setBusy(true); setError(""); setMessage("");
-    try { await request(`/api/recipients/${remove.id}`, "DELETE", {}); setMessage("Recipient removed from this newsletter list."); if (selected?.id === remove.id) choose(null); setRemove(null); await load(); }
+    try { await request(`/api/recipients/${remove.id}`, "DELETE", {}); onChanged(); setMessage("Recipient removed from this newsletter list."); if (selected?.id === remove.id) choose(null); setRemove(null); await load(); }
     catch (e) { setError((e as Error).message); setRemove(null); }
     finally { setBusy(false); }
   }
