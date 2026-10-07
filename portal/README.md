@@ -142,6 +142,9 @@ Do not rerun this setup command once clients start using the automatic switch un
 
 1. Enter an approved email address and select **Send login link**. Check your inbox and spam folder.
 2. Open the email link and select **Continue to portal**. Opening the page alone does not use the link.
+   Keep the original sign-in tab open. It enters the portal after the same browser confirms your login.
+   The email tab closes when permitted. Otherwise, it tells you to return to the original tab.
+   If the original tab is closed or you use a different browser, the email tab opens the portal itself.
 3. Open **Newsletter** and read the draft. **Previous issues** opens issue history.
 4. Click **Choose recipients**, or open **Recipients** and use **Choose receivers for**.
 5. Tick **Receive this issue** beside each person who should receive that newsletter. Choices save immediately.
