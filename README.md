@@ -11,6 +11,16 @@ It lives in `portal/` and deploys separately on Vercel. Its Settings page edits
 sources, keywords, and draft scheduling in Google Sheets. It can also request an
 immediate draft through GitHub. Production delivery was enabled at the owner's request.
 
+## Portal screenshots
+
+These screenshots use the portal's local demonstration mode with sample data only.
+
+![Newsletter review page](docs/screenshots/newsletter-desktop.png)
+
+![Recipients page](docs/screenshots/recipients-desktop.png)
+
+<img src="docs/screenshots/newsletter-mobile.png" alt="Newsletter review page on a phone" width="320">
+
 ## Setup
 
 ```powershell
